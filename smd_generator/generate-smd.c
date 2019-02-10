@@ -18,8 +18,8 @@
 #define OFFSET_SLOT_METADATA 0
 
 #define BOOTCTRL_MAGIC 0x43424E00 /*magic number: '\0NBC' */
-#define BOOTCTRL_SUFFIX_A           "-A"
-#define BOOTCTRL_SUFFIX_B           "-B"
+#define BOOTCTRL_SUFFIX_A           "_a"
+#define BOOTCTRL_SUFFIX_B           "_b"
 #define MAX_SLOTS 2
 #define BOOTCTRL_VERSION 1
 
@@ -53,6 +53,7 @@ typedef struct smd_partition {
     uint16_t num_slots;
     /*slot parameter structure */
     slot_info_t slot_info[MAX_SLOTS];
+    uint32_t crc32;
 } smd_partition_t;
 
 int main(int argc, char *argv[])
@@ -69,9 +70,9 @@ int main(int argc, char *argv[])
     bootC.slot_info[0].boot_successful = 1;
     strncpy(bootC.slot_info[0].suffix, BOOTCTRL_SUFFIX_A, 2);
 
-    bootC.slot_info[1].priority = 0;
-    bootC.slot_info[1].retry_count = 0;
-    bootC.slot_info[1].boot_successful = 0;
+    bootC.slot_info[1].priority = 10;
+    bootC.slot_info[1].retry_count = 7;
+    bootC.slot_info[1].boot_successful = 1;
     strncpy(bootC.slot_info[1].suffix, BOOTCTRL_SUFFIX_B, 2);
 
     bootC.magic = BOOTCTRL_MAGIC;
