@@ -63,7 +63,7 @@ error:
  */
 static int bootctrl_get_active_slot()
 {
-    int i, err, slot;
+    int i, err;
     char prop[PROPERTY_VALUE_MAX];
     smd_partition_t smd_partition;
 
