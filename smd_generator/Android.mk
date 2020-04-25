@@ -23,21 +23,3 @@ LOCAL_C_INCLUDES := \
 LOCAL_CFLAGS := -Wno-unused-parameter
 
 include $(BUILD_HOST_EXECUTABLE)
-
-include $(NVIDIA_DEFAULTS)
-
-LOCAL_MODULE        := slot_metadata
-LOCAL_MODULE_SUFFIX := .bin
-LOCAL_MODULE_CLASS  := EXECUTABLES
-LOCAL_MODULE_PATH := $(PRODUCT_OUT)
-
-include $(NVIDIA_BASE)
-include $(BUILD_SYSTEM)/base_rules.mk
-include $(NVIDIA_POST)
-
-$(LOCAL_BUILT_MODULE): PRIVATE_CUSTOM_TOOL = \
-	$(ANDROID_HOST_OUT)/bin/nv_smd_generator $(ANDROID_BUILD_TOP)/$@
-$(LOCAL_BUILT_MODULE): | nv_smd_generator
-	$(transform-generated-source)
-
-.PHONY: $(LOCAL_BUILT_MODULE)
