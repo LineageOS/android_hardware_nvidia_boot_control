@@ -18,13 +18,25 @@ include $(CLEAR_VARS)
 
 LOCAL_MODULE := bootctrl.tegra
 LOCAL_MODULE_RELATIVE_PATH := hw
+LOCAL_VENDOR_MODULE := true
 LOCAL_MODULE_TAGS := optional
 LOCAL_C_INCLUDES = $(LOCAL_PATH)/include
+LOCAL_HEADER_LIBRARIES := libhardware_headers
 LOCAL_SRC_FILES := bootctrl_nvidia.c
 
 LOCAL_SHARED_LIBRARIES := libcutils
 
 include $(BUILD_SHARED_LIBRARY)
+
+include $(CLEAR_VARS)
+
+LOCAL_MODULE := bootctrl.tegra
+LOCAL_MODULE_TAGS := optional
+LOCAL_C_INCLUDES = $(LOCAL_PATH)/include
+LOCAL_HEADER_LIBRARIES := libhardware_headers
+LOCAL_SRC_FILES := bootctrl_nvidia.c
+
+include $(BUILD_STATIC_LIBRARY)
 
 include $(CLEAR_VARS)
 
