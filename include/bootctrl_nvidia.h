@@ -19,13 +19,13 @@
 #define BOOTCTRL_SUFFIX_A           "_a"
 #define BOOTCTRL_SUFFIX_B           "_b"
 #define MAX_SLOTS 2
-#define BOOTCTRL_VERSION 1
+#define BOOTCTRL_VERSION 3
 #define MAX_COUNT   7
 
 /*This is just for test. Will define new slot_metadata partition */
 #define BOOTCTRL_SLOTMETADATA_FILE  "/dev/block/by-name/SMD"
 
-typedef struct slot_info {
+typedef struct __attribute__((__packed__)) slot_info {
     /*
      * boot priority of slot.
      * range [0:15]
@@ -48,12 +48,13 @@ typedef struct slot_info {
 
 } slot_info_t;
 
-typedef struct smd_partition {
+typedef struct __attribute__((__packed__)) smd_partition {
     /* Magic number  for idetification */
     uint32_t magic;
     uint16_t version;
     uint16_t num_slots;
     /*slot parameter structure */
     slot_info_t slot_info[MAX_SLOTS];
+    uint32_t crc32;
 } smd_partition_t;
 #endif /* _BOOTCTRL_NVIDIA_H_ */

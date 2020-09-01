@@ -17,6 +17,7 @@
 #include <hardware/hardware.h>
 #include "boot_control.h"
 #include <cutils/properties.h>
+#include <zlib.h>
 
 #include "bootctrl_nvidia.h"
 
@@ -36,7 +37,12 @@ static int bootctrl_access_metadata(smd_partition_t *smd_partition, int writed)
     }
 
     /* Read/Write slot_medata */
-    (writed)?(sz = write(fd, buf, size)):(sz = read(fd, buf, size));
+    if (writed) {
+      smd_partition->crc32 = crc32(0, (const unsigned char*)buf, sizeof(smd_partition_t)-sizeof(uint32_t));
+      sz = write(fd, buf, size);
+    } else {
+      sz = read(fd, buf, size);
+    }
 
     if(sz < 0) {
 
