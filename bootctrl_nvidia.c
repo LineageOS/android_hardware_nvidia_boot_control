@@ -21,6 +21,9 @@
 
 #include "bootctrl_nvidia.h"
 
+static int32_t OFFSET_SLOT_METADATA = OFFSET_SLOT_METADATA_DEFAULT;
+static char BOOTCTRL_SLOTMETADATA_FILE[PROPERTY_VALUE_MAX] = BOOTCTRL_SLOTMETADATA_FILE_DEFAULT;
+
 static int bootctrl_access_metadata(smd_partition_t *smd_partition, int writed)
 {
     int fd;
@@ -255,6 +258,16 @@ unsigned bootctrl_get_number_slots(boot_control_module_t *module __unused)
 void bootctrl_init(boot_control_module_t *module __unused)
 {
     smd_partition_t smd_partition;
+    char prop_path[PROPERTY_VALUE_MAX];
+    char prop_offset[PROPERTY_VALUE_MAX];
+
+    property_get("ro.vendor.smd_path", prop_path, "");
+    property_get("ro.vendor.smd_offset", prop_offset, "");
+
+    if (prop_path[0] != '\0')
+      strncpy(BOOTCTRL_SLOTMETADATA_FILE, prop_path, PROPERTY_VALUE_MAX);
+    if (prop_offset[0] != '\0')
+      OFFSET_SLOT_METADATA = strtoul(prop_offset, NULL, 0);
 
     bootctrl_access_metadata(&smd_partition, 0);
 
