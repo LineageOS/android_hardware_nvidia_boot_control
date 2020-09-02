@@ -13,7 +13,7 @@
 
 #include <stdint.h>
 
-#define OFFSET_SLOT_METADATA 0
+#define OFFSET_SLOT_METADATA_DEFAULT 0
 
 #define BOOTCTRL_MAGIC 0x43424E00 /*magic number: '\0NBC' */
 #define BOOTCTRL_SUFFIX_A           "_a"
@@ -23,7 +23,7 @@
 #define MAX_COUNT   7
 
 /*This is just for test. Will define new slot_metadata partition */
-#define BOOTCTRL_SLOTMETADATA_FILE  "/dev/block/by-name/SMD"
+#define BOOTCTRL_SLOTMETADATA_FILE_DEFAULT "/dev/block/by-name/SMD"
 
 typedef struct __attribute__((__packed__)) slot_info {
     /*
