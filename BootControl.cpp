@@ -23,10 +23,9 @@
 #include <zlib.h>
 
 using ::android::base::GetProperty;
-using ::android::base::GetIntProperty;
 
-int32_t smd_offset;
 std::string smd_device;
+smd_info_t smd_info;
 
 bool accessSlotMetadata(smd_partition_t *smd_partition, bool writed) {
     ssize_t size = sizeof(smd_partition_t);
@@ -38,7 +37,7 @@ bool accessSlotMetadata(smd_partition_t *smd_partition, bool writed) {
         printf("Fail to open metadata file\n");
         return false;
     }
-    smd.seekg(smd_offset);
+    smd.seekg(smd_info.start_sector * 512);
     if (smd.fail()) {
         printf("Error seeking to metadata offset\n");
         return false;
@@ -184,9 +183,94 @@ const char* getSuffix(boot_control_module_t *module __unused, unsigned slot) {
     return suffix;
 }
 
+soc_type_t getSocType()
+{
+    soc_type_t soc_type = SOC_TYPE_UNKNOWN;
+
+    std::ifstream file("/proc/device-tree/compatible", std::ios::binary);
+    if (!file.is_open())
+        return SOC_TYPE_UNKNOWN;
+
+    file.seekg(0, std::ios::end);
+    auto size = file.tellg();
+    file.seekg(0);
+    std::vector<char> compatible(size, '\0');
+    file.read(compatible.data(), size);
+
+    std::string search_type = "nvidia,tegra210";
+    if (std::search(compatible.begin(), compatible.end(), search_type.begin(),
+                    search_type.end()) !=
+        compatible.end()) {
+        soc_type = SOC_TYPE_T210;
+    }
+
+    search_type = "nvidia,tegra186";
+    if (std::search(compatible.begin(), compatible.end(), search_type.begin(),
+                    search_type.end()) !=
+        compatible.end()) {
+        soc_type = SOC_TYPE_T186;
+    }
+
+    search_type = "nvidia,tegra194";
+    if (std::search(compatible.begin(), compatible.end(), search_type.begin(),
+                    search_type.end()) !=
+        compatible.end()) {
+        soc_type = SOC_TYPE_T194;
+    }
+
+    return soc_type;
+}
+
 void BootControl(boot_control_module_t *module __unused) {
-    smd_device = GetProperty("ro.vendor.smd_path", BOOTCTRL_SLOTMETADATA_FILE_DEFAULT);
-    smd_offset = GetIntProperty("ro.vendor.smd_offset", OFFSET_SLOT_METADATA_DEFAULT);
+    int32_t smd_info_offset = 0;
+    soc_type_t soc_type = getSocType();
+    smd_info_t smd_user = { TEGRABL_STORAGE_SDMMC_USER, 3, 0, 4096 };
+
+    switch (soc_type) {
+        case SOC_TYPE_T186:
+            smd_info_offset = SMD_INFO_OFFSET_T18x;
+            break;
+
+        case SOC_TYPE_T194:
+            smd_info_offset = SMD_INFO_OFFSET_T19x;
+            break;
+
+        // Cannot read bct on t210, attempt to use a userspace visible SMD
+        case SOC_TYPE_T210:
+        // If soc is unknown, attempt to use a userspace visible SMD
+        case SOC_TYPE_UNKNOWN:
+            smd_device = BOOTCTRL_SLOTMETADATA_FILE_DEFAULT;
+            smd_info = smd_user;
+            break;
+    }
+
+    if (smd_info_offset) {
+        smd_device = GetProperty("vendor.tegra.ota.boot_device", BOOTCTRL_SLOTMETADATA_FILE_DEFAULT);
+
+        if (smd_device.compare(BOOTCTRL_SLOTMETADATA_FILE_DEFAULT) == 0) {
+            smd_info = smd_user;
+            return;
+        }
+
+        std::ifstream smd_info_fd(smd_device, std::ios::binary);
+        if (!smd_info_fd.is_open())
+            return;
+
+        smd_info_fd.seekg(smd_info_offset);
+        smd_info_fd.read((char*)&smd_info, sizeof(smd_info_t));
+
+        switch (smd_info.device_type) {
+            case TEGRABL_STORAGE_SDMMC_USER:
+            case TEGRABL_STORAGE_SATA:
+            case TEGRABL_STORAGE_USB_MS:
+            case TEGRABL_STORAGE_SDCARD:
+            case TEGRABL_STORAGE_UFS_USER:
+            case TEGRABL_STORAGE_NVME:
+                smd_device = BOOTCTRL_SLOTMETADATA_FILE_DEFAULT;
+                smd_info.start_sector = 0;
+                break;
+        }
+    }
 }
 
 boot_control_module_t HAL_MODULE_INFO_SYM = {

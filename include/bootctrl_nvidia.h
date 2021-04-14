@@ -13,8 +13,6 @@
 
 #include <stdint.h>
 
-#define OFFSET_SLOT_METADATA_DEFAULT 0
-
 #define BOOTCTRL_MAGIC 0x43424E00 /*magic number: '\0NBC' */
 #define BOOTCTRL_SUFFIX_A           "_a"
 #define BOOTCTRL_SUFFIX_B           "_b"
@@ -24,6 +22,38 @@
 
 /*This is just for test. Will define new slot_metadata partition */
 #define BOOTCTRL_SLOTMETADATA_FILE_DEFAULT "/dev/block/by-name/SMD"
+
+#define SMD_INFO_OFFSET_T18x 0x664
+#define SMD_INFO_OFFSET_T19x 0x7DC
+
+typedef enum {
+    SOC_TYPE_UNKNOWN = 0,
+    SOC_TYPE_T210,
+    SOC_TYPE_T186,
+    SOC_TYPE_T194
+} soc_type_t;
+
+typedef enum {
+    TEGRABL_STORAGE_SDMMC_BOOT = 0,
+    TEGRABL_STORAGE_SDMMC_USER,
+    TEGRABL_STORAGE_SDMMC_RPMB,
+    TEGRABL_STORAGE_QSPI_FLASH,
+    TEGRABL_STORAGE_SATA,
+    TEGRABL_STORAGE_USB_MS,
+    TEGRABL_STORAGE_SDCARD,
+    TEGRABL_STORAGE_UFS,
+    TEGRABL_STORAGE_UFS_USER,
+    TEGRABL_STORAGE_UFS_RPMB,
+    TEGRABL_STORAGE_NVME,
+    TEGRABL_STORAGE_MAX
+} tegrabl_storage_type_t;
+
+typedef struct slotmetadata_info {
+    uint16_t device_type;
+    uint16_t device_instance;
+    uint32_t start_sector;
+    uint32_t partition_size;
+} smd_info_t;
 
 typedef struct __attribute__((__packed__)) slot_info {
     /*
