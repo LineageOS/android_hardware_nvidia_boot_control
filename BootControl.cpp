@@ -14,20 +14,18 @@
  * limitations under the License.
  */
 
-#include "bootctrl_nvidia.h"
+#include "BootControl.h"
 
-#include <android-base/properties.h>
-#include <hardware/boot_control.h>
 #include <fstream>
-#include <vector>
 #include <zlib.h>
 
-using ::android::base::GetProperty;
+namespace android {
+namespace hardware {
+namespace boot {
+namespace V1_0 {
+namespace implementation {
 
-std::string smd_device;
-smd_info_t smd_info;
-
-bool validateSlotMetadata() {
+bool BootControl::validateSlotMetadata() {
     ssize_t crc_size = sizeof(smd_partition_t) - sizeof(uint32_t);
     smd_partition_t smd_partition, smd_backup;
 
@@ -94,7 +92,7 @@ bool validateSlotMetadata() {
     }
 }
 
-bool readSlotMetadata(smd_partition_t *smd_partition) {
+bool BootControl::readSlotMetadata(smd_partition_t *smd_partition) {
     // Only read primary smd, no need to also read backup
     std::ifstream smd(smd_device, std::ios::binary);
     if(!smd.is_open())
@@ -111,7 +109,7 @@ bool readSlotMetadata(smd_partition_t *smd_partition) {
     return true;
 }
 
-bool writeSlotMetadata(smd_partition_t *smd_partition) {
+bool BootControl::writeSlotMetadata(smd_partition_t *smd_partition) {
     ssize_t crc_size = sizeof(smd_partition_t) - sizeof(uint32_t);
 
     if (smd_info.device_type == TEGRABL_STORAGE_SDMMC_BOOT) {
@@ -180,7 +178,8 @@ bool writeSlotMetadata(smd_partition_t *smd_partition) {
     return validateSlotMetadata();
 }
 
-unsigned getNumberSlots(boot_control_module_t *module __unused) {
+// Methods from ::android::hardware::boot::V1_0::IBootControl follow.
+Return<uint32_t> BootControl::getNumberSlots() {
     smd_partition_t smd_partition;
 
     if (!readSlotMetadata(&smd_partition))
@@ -189,7 +188,7 @@ unsigned getNumberSlots(boot_control_module_t *module __unused) {
     return smd_partition.num_slots;
 }
 
-unsigned getCurrentSlot(boot_control_module_t *module __unused) {
+Return<uint32_t> BootControl::getCurrentSlot() {
     smd_partition_t smd_partition;
     std::string slot_suffix = GetProperty("ro.boot.slot_suffix", "");
 
@@ -204,28 +203,40 @@ unsigned getCurrentSlot(boot_control_module_t *module __unused) {
     return -EINVAL;
 }
 
-int markBootSuccessful(boot_control_module_t *module) {
+Return<void> BootControl::markBootSuccessful(markBootSuccessful_cb _hidl_cb) {
     smd_partition_t smd_partition;
-    int slot = getCurrentSlot(module);
+    int slot = getCurrentSlot();
 
-    if (!readSlotMetadata(&smd_partition))
-        return -EIO;
+    if (!readSlotMetadata(&smd_partition)) {
+        _hidl_cb(CommandResult{false, "Failed to read metadata"});
+        return Void();
+    }
 
     smd_partition.slot_info[slot].boot_successful = 1;
     smd_partition.slot_info[slot].retry_count = MAX_COUNT;
 
-    return (writeSlotMetadata(&smd_partition) ? 0 : -EIO);
+    if (!writeSlotMetadata(&smd_partition)) {
+        _hidl_cb(CommandResult{false, "Failed to write metadata"});
+        return Void();
+    }
+
+    _hidl_cb(CommandResult{true, ""});
+    return Void();
 }
 
-int setActiveBootSlot(boot_control_module_t *module, unsigned slot) {
+Return<void> BootControl::setActiveBootSlot(uint32_t slot, setActiveBootSlot_cb _hidl_cb) {
     smd_partition_t smd_partition;
-    int slot_s = getCurrentSlot(module);
+    int slot_s = getCurrentSlot();
 
-    if (!readSlotMetadata(&smd_partition))
-        return -EIO;
+    if (!readSlotMetadata(&smd_partition)) {
+        _hidl_cb(CommandResult{false, "Failed to read metadata"});
+        return Void();
+    }
 
-    if (slot >= smd_partition.num_slots)
-        return -EINVAL;
+    if (slot >= smd_partition.num_slots) {
+        _hidl_cb(CommandResult{false, "Requested slot is larger than available slots"});
+        return Void();
+    }
 
     /*
      * Set the target slot priority to max value 15.
@@ -241,17 +252,27 @@ int setActiveBootSlot(boot_control_module_t *module, unsigned slot) {
      */
     smd_partition.slot_info[slot_s].priority = 14;
 
-    return (writeSlotMetadata(&smd_partition) ? 0 : -EIO);
+    if (!writeSlotMetadata(&smd_partition)) {
+        _hidl_cb(CommandResult{false, "Failed to write metadata"});
+        return Void();
+    }
+
+    _hidl_cb(CommandResult{true, ""});
+    return Void();
 }
 
-int setSlotAsUnbootable(boot_control_module_t *module __unused, unsigned slot) {
+Return<void> BootControl::setSlotAsUnbootable(uint32_t slot, setSlotAsUnbootable_cb _hidl_cb) {
     smd_partition_t smd_partition;
 
-    if (!readSlotMetadata(&smd_partition))
-        return -EIO;
+    if (!readSlotMetadata(&smd_partition)) {
+        _hidl_cb(CommandResult{false, "Failed to read metadata"});
+        return Void();
+    }
 
-    if (slot >= smd_partition.num_slots)
-        return -EINVAL;
+    if (slot >= smd_partition.num_slots) {
+        _hidl_cb(CommandResult{false, "Requested slot is larger than available slots"});
+        return Void();
+    }
 
     /*
      * As this slot is unbootable, set all of value to zero
@@ -261,49 +282,58 @@ int setSlotAsUnbootable(boot_control_module_t *module __unused, unsigned slot) {
     smd_partition.slot_info[slot].boot_successful = 0;
     smd_partition.slot_info[slot].retry_count = 0;
 
-    return (readSlotMetadata(&smd_partition) ? 0 : -EIO);
+    if (!writeSlotMetadata(&smd_partition)) {
+        _hidl_cb(CommandResult{false, "Failed to write metadata"});
+        return Void();
+    }
+
+    _hidl_cb(CommandResult{true, ""});
+    return Void();
 }
 
-int isSlotBootable(boot_control_module_t *module __unused, unsigned slot) {
+Return<BoolResult> BootControl::isSlotBootable(uint32_t slot) {
     smd_partition_t smd_partition;
 
     if (!readSlotMetadata(&smd_partition))
-        return -EIO;
+        return BoolResult::FALSE;
 
     if (slot >= smd_partition.num_slots)
-        return -EINVAL;
+        return BoolResult::INVALID_SLOT;
 
-    return (smd_partition.slot_info[slot].priority != 0 ? 1 : 0);
+    return static_cast<BoolResult>(smd_partition.slot_info[slot].priority != 0);
 }
 
-int isSlotMarkedSuccessful(boot_control_module_t *module __unused, unsigned slot) {
+Return<BoolResult> BootControl::isSlotMarkedSuccessful(uint32_t slot) {
     smd_partition_t smd_partition;
 
     if (!readSlotMetadata(&smd_partition))
-        return -EIO;
+        return BoolResult::FALSE;
 
     if (slot >= smd_partition.num_slots)
-        return -EINVAL;
+        return BoolResult::INVALID_SLOT;
 
-    return (smd_partition.slot_info[slot].boot_successful ? 1 : 0);
+    return static_cast<BoolResult>(smd_partition.slot_info[slot].boot_successful);
 }
 
-char suffix[2];
-const char* getSuffix(boot_control_module_t *module __unused, unsigned slot) {
+Return<void> BootControl::getSuffix(uint32_t slot, getSuffix_cb _hidl_cb) {
     smd_partition_t smd_partition;
 
-    if (!readSlotMetadata(&smd_partition))
-        return NULL;
+    if (!readSlotMetadata(&smd_partition)) {
+        _hidl_cb(NULL);
+        return Void();
+    }
 
-    if (slot >= smd_partition.num_slots)
-        return NULL;
+    if (slot >= smd_partition.num_slots) {
+        _hidl_cb(NULL);
+        return Void();
+    }
 
-    strncpy(suffix, smd_partition.slot_info[slot].suffix, 2);
+    _hidl_cb(smd_partition.slot_info[slot].suffix);
 
-    return suffix;
+    return Void();
 }
 
-soc_type_t getSocType()
+soc_type_t BootControl::getSocType()
 {
     soc_type_t soc_type = SOC_TYPE_UNKNOWN;
 
@@ -341,7 +371,7 @@ soc_type_t getSocType()
     return soc_type;
 }
 
-void BootControl(boot_control_module_t *module __unused) {
+BootControl::BootControl() {
     int32_t smd_info_offset = 0;
     soc_type_t soc_type = getSocType();
     smd_info_t smd_user = { TEGRABL_STORAGE_SDMMC_USER, 3, 0, 4096 };
@@ -393,22 +423,12 @@ void BootControl(boot_control_module_t *module __unused) {
     }
 }
 
-boot_control_module_t HAL_MODULE_INFO_SYM = {
-    .common = {
-        .tag                 = HARDWARE_MODULE_TAG,
-        .module_api_version  = BOOT_CONTROL_MODULE_API_VERSION_0_1,
-        .hal_api_version     = HARDWARE_HAL_API_VERSION,
-        .id                  = BOOT_CONTROL_HARDWARE_MODULE_ID,
-        .name                = "Nvidia Boot Control HAL",
-        .author              = "Nvidia Corporation",
-    },
-    .init                   = BootControl,
-    .getNumberSlots         = getNumberSlots,
-    .getCurrentSlot         = getCurrentSlot,
-    .markBootSuccessful     = markBootSuccessful,
-    .setActiveBootSlot      = setActiveBootSlot,
-    .setSlotAsUnbootable    = setSlotAsUnbootable,
-    .isSlotBootable         = isSlotBootable,
-    .getSuffix              = getSuffix,
-    .isSlotMarkedSuccessful = isSlotMarkedSuccessful,
-};
+IBootControl* HIDL_FETCH_IBootControl(const char* /* hal */) {
+    return new BootControl();
+}
+
+}  // namespace implementation
+}  // namespace V1_0
+}  // namespace boot
+}  // namespace hardware
+}  // namespace android
