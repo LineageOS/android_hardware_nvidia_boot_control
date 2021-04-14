@@ -27,6 +27,14 @@ using ::android::base::GetProperty;
 std::string smd_device;
 smd_info_t smd_info;
 
+bool validateSlotMetadata(smd_partition_t *smd_partition) {
+    ssize_t crc_size = sizeof(smd_partition_t) - sizeof(uint32_t);
+    char *buf = (char*)smd_partition;
+    uint32_t crc = crc32(0, (const unsigned char*)buf, crc_size);
+
+    return (smd_partition->crc32 == crc);
+}
+
 bool readSlotMetadata(smd_partition_t *smd_partition) {
     std::ifstream smd(smd_device, std::ios::binary);
     if(!smd.is_open())
@@ -37,13 +45,16 @@ bool readSlotMetadata(smd_partition_t *smd_partition) {
         return false;
 
     smd.read((char*)smd_partition, sizeof(smd_partition_t));
+    if (smd.fail())
+        return false;
 
-    return !smd.fail();
+    return validateSlotMetadata(smd_partition);
 }
 
 bool writeSlotMetadata(smd_partition_t *smd_partition) {
     ssize_t crc_size = sizeof(smd_partition_t) - sizeof(uint32_t);
     char *buf = (char*)smd_partition;
+    smd_partition_t smd_verify;
 
     std::ofstream smd(smd_device, std::ios::binary);
     if(!smd.is_open())
@@ -57,7 +68,11 @@ bool writeSlotMetadata(smd_partition_t *smd_partition) {
     smd.write(buf, sizeof(smd_partition_t));
     smd.flush();
 
-    return !smd.fail();
+    if (smd.fail())
+        return false;
+
+    // Read back to validate successful write
+    return readSlotMetadata(&smd_verify);
 }
 
 unsigned getNumberSlots(boot_control_module_t *module __unused) {
