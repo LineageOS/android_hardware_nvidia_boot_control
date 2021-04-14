@@ -27,43 +27,43 @@ using ::android::base::GetProperty;
 std::string smd_device;
 smd_info_t smd_info;
 
-bool accessSlotMetadata(smd_partition_t *smd_partition, bool writed) {
-    ssize_t size = sizeof(smd_partition_t);
-    ssize_t crc_size = size - sizeof(uint32_t);
+bool readSlotMetadata(smd_partition_t *smd_partition) {
+    std::ifstream smd(smd_device, std::ios::binary);
+    if(!smd.is_open())
+        return false;
+
+    smd.seekg(smd_info.start_sector * 512);
+    if (smd.fail())
+        return false;
+
+    smd.read((char*)smd_partition, sizeof(smd_partition_t));
+
+    return !smd.fail();
+}
+
+bool writeSlotMetadata(smd_partition_t *smd_partition) {
+    ssize_t crc_size = sizeof(smd_partition_t) - sizeof(uint32_t);
     char *buf = (char*)smd_partition;
 
-    std::fstream smd(smd_device, std::ios::binary | std::ios::in | std::ios::out);
-    if(!smd.is_open()) {
-        printf("Fail to open metadata file\n");
+    std::ofstream smd(smd_device, std::ios::binary);
+    if(!smd.is_open())
         return false;
-    }
-    smd.seekg(smd_info.start_sector * 512);
-    if (smd.fail()) {
-        printf("Error seeking to metadata offset\n");
+
+    smd.seekp(smd_info.start_sector * 512);
+    if (smd.fail())
         return false;
-    }
 
-    /* Read/Write slot_medata */
-    if (writed) {
-        smd_partition->crc32 = crc32(0, (const unsigned char*)buf, crc_size);
-        smd.write(buf, size);
-        smd.flush();
-    } else {
-        smd.read(buf, size);
-    }
+    smd_partition->crc32 = crc32(0, (const unsigned char*)buf, crc_size);
+    smd.write(buf, sizeof(smd_partition_t));
+    smd.flush();
 
-    if (smd.fail()) {
-        printf("Fail to %s slot metadata \n", (writed)?("write"):("read"));
-        return false;
-    }
-
-    return true;
+    return !smd.fail();
 }
 
 unsigned getNumberSlots(boot_control_module_t *module __unused) {
     smd_partition_t smd_partition;
 
-    if (!accessSlotMetadata(&smd_partition, false))
+    if (!readSlotMetadata(&smd_partition))
         return -EIO;
 
     return smd_partition.num_slots;
@@ -73,7 +73,7 @@ unsigned getCurrentSlot(boot_control_module_t *module __unused) {
     smd_partition_t smd_partition;
     std::string slot_suffix = GetProperty("ro.boot.slot_suffix", "");
 
-    if (!accessSlotMetadata(&smd_partition, false))
+    if (!readSlotMetadata(&smd_partition))
         return -EIO;
 
     for (uint8_t i = 0 ; i < smd_partition.num_slots; i++) {
@@ -88,20 +88,20 @@ int markBootSuccessful(boot_control_module_t *module) {
     smd_partition_t smd_partition;
     int slot = getCurrentSlot(module);
 
-    if (!accessSlotMetadata(&smd_partition, false))
+    if (!readSlotMetadata(&smd_partition))
         return -EIO;
 
     smd_partition.slot_info[slot].boot_successful = 1;
     smd_partition.slot_info[slot].retry_count = MAX_COUNT;
 
-    return (accessSlotMetadata(&smd_partition, true) ? 0 : -EIO);
+    return (writeSlotMetadata(&smd_partition) ? 0 : -EIO);
 }
 
 int setActiveBootSlot(boot_control_module_t *module, unsigned slot) {
     smd_partition_t smd_partition;
     int slot_s = getCurrentSlot(module);
 
-    if (!accessSlotMetadata(&smd_partition, false))
+    if (!readSlotMetadata(&smd_partition))
         return -EIO;
 
     if (slot >= smd_partition.num_slots)
@@ -121,13 +121,13 @@ int setActiveBootSlot(boot_control_module_t *module, unsigned slot) {
      */
     smd_partition.slot_info[slot_s].priority = 14;
 
-    return (accessSlotMetadata(&smd_partition, true) ? 0 : -EIO);
+    return (writeSlotMetadata(&smd_partition) ? 0 : -EIO);
 }
 
 int setSlotAsUnbootable(boot_control_module_t *module __unused, unsigned slot) {
     smd_partition_t smd_partition;
 
-    if (!accessSlotMetadata(&smd_partition, false))
+    if (!readSlotMetadata(&smd_partition))
         return -EIO;
 
     if (slot >= smd_partition.num_slots)
@@ -141,13 +141,13 @@ int setSlotAsUnbootable(boot_control_module_t *module __unused, unsigned slot) {
     smd_partition.slot_info[slot].boot_successful = 0;
     smd_partition.slot_info[slot].retry_count = 0;
 
-    return (accessSlotMetadata(&smd_partition, true) ? 0 : -EIO);
+    return (readSlotMetadata(&smd_partition) ? 0 : -EIO);
 }
 
 int isSlotBootable(boot_control_module_t *module __unused, unsigned slot) {
     smd_partition_t smd_partition;
 
-    if (!accessSlotMetadata(&smd_partition, false))
+    if (!readSlotMetadata(&smd_partition))
         return -EIO;
 
     if (slot >= smd_partition.num_slots)
@@ -159,7 +159,7 @@ int isSlotBootable(boot_control_module_t *module __unused, unsigned slot) {
 int isSlotMarkedSuccessful(boot_control_module_t *module __unused, unsigned slot) {
     smd_partition_t smd_partition;
 
-    if (!accessSlotMetadata(&smd_partition, false))
+    if (!readSlotMetadata(&smd_partition))
         return -EIO;
 
     if (slot >= smd_partition.num_slots)
@@ -172,7 +172,7 @@ char suffix[2];
 const char* getSuffix(boot_control_module_t *module __unused, unsigned slot) {
     smd_partition_t smd_partition;
 
-    if (!accessSlotMetadata(&smd_partition, false))
+    if (!readSlotMetadata(&smd_partition))
         return NULL;
 
     if (slot >= smd_partition.num_slots)
