@@ -27,15 +27,75 @@ using ::android::base::GetProperty;
 std::string smd_device;
 smd_info_t smd_info;
 
-bool validateSlotMetadata(smd_partition_t *smd_partition) {
+bool validateSlotMetadata() {
     ssize_t crc_size = sizeof(smd_partition_t) - sizeof(uint32_t);
-    char *buf = (char*)smd_partition;
-    uint32_t crc = crc32(0, (const unsigned char*)buf, crc_size);
+    smd_partition_t smd_partition, smd_backup;
 
-    return (smd_partition->crc32 == crc);
+    if (smd_info.start_sector != 0) {
+        // SMD is on a device that does not have an accessible partition table
+        std::ifstream smd(smd_device, std::ios::binary);
+        if(!smd.is_open())
+            return false;
+
+        // Seek to primary smd and read
+        smd.seekg(smd_info.start_sector * 512);
+        if (smd.fail())
+            return false;
+
+        smd.read((char*)&smd_partition, sizeof(smd_partition_t));
+        if (smd.fail())
+            return false;
+
+        // Seek to backup smd and read
+        smd.seekg(smd_info.start_sector * 512 + smd_info.partition_size);
+        if (smd.fail())
+            return false;
+
+        smd.read((char*)&smd_backup, sizeof(smd_partition_t));
+        if (smd.fail())
+            return false;
+    } else {
+        // SMD is on a device that does have an accessible partition table
+        // Open primary smd and read
+        std::ifstream smd(smd_device, std::ios::binary);
+        if(!smd.is_open())
+            return false;
+
+        smd.read((char*)&smd_partition, sizeof(smd_partition_t));
+        if (smd.fail())
+            return false;
+
+        // Open backup smd and read
+        std::ifstream smd_b(smd_device + "_b", std::ios::binary);
+        if(!smd_b.is_open())
+            return false;
+
+        smd_b.read((char*)&smd_backup, sizeof(smd_partition_t));
+        if (smd_b.fail())
+            return false;
+    }
+
+    uint32_t crc   = crc32(0, (const unsigned char*)&smd_partition, crc_size);
+    uint32_t crc_b = crc32(0, (const unsigned char*)&smd_backup,    crc_size);
+
+    if (smd_partition.crc32 == crc && smd_backup.crc32 == crc_b &&
+        crc == crc_b) {
+        // Everything checks out
+        return true;
+    } else if (smd_partition.crc32 == crc) {
+        // Either backup is corrupt or primary and backup do not match
+        return false; // TODO: write primary to backup
+    } else if (smd_backup.crc32 == crc) {
+        // Primary is corrupt
+        return false; // TODO: write backup to primary
+    } else {
+        // Both are corrupt, can't do anything
+        return false;
+    }
 }
 
 bool readSlotMetadata(smd_partition_t *smd_partition) {
+    // Only read primary smd, no need to also read backup
     std::ifstream smd(smd_device, std::ios::binary);
     if(!smd.is_open())
         return false;
@@ -48,13 +108,11 @@ bool readSlotMetadata(smd_partition_t *smd_partition) {
     if (smd.fail())
         return false;
 
-    return validateSlotMetadata(smd_partition);
+    return true;
 }
 
 bool writeSlotMetadata(smd_partition_t *smd_partition) {
     ssize_t crc_size = sizeof(smd_partition_t) - sizeof(uint32_t);
-    char *buf = (char*)smd_partition;
-    smd_partition_t smd_verify;
 
     if (smd_info.device_type == TEGRABL_STORAGE_SDMMC_BOOT) {
         std::ofstream boot_lock("/sys/block/mmcblk0boot0/force_ro");
@@ -62,20 +120,55 @@ bool writeSlotMetadata(smd_partition_t *smd_partition) {
             boot_lock.write("0", 1);
     }
 
-    std::ofstream smd(smd_device, std::ios::binary);
-    if(!smd.is_open())
-        return false;
+    smd_partition->crc32 = crc32(0, (const unsigned char*)smd_partition, crc_size);
 
-    smd.seekp(smd_info.start_sector * 512);
-    if (smd.fail())
-        return false;
+    if (smd_info.start_sector != 0) {
+        // SMD is on a device that does not have an accessible partition table
+        std::ofstream smd(smd_device, std::ios::binary);
+        if(!smd.is_open())
+            return false;
 
-    smd_partition->crc32 = crc32(0, (const unsigned char*)buf, crc_size);
-    smd.write(buf, sizeof(smd_partition_t));
-    smd.flush();
+        // Seek to primary smd and write
+        smd.seekp(smd_info.start_sector * 512);
+        if (smd.fail())
+            return false;
 
-    if (smd.fail())
-        return false;
+        smd.write((char*)smd_partition, sizeof(smd_partition_t));
+        smd.flush();
+        if (smd.fail())
+            return false;
+
+        // Seek to backup smd and write
+        smd.seekp(smd_info.start_sector * 512 + smd_info.partition_size);
+        if (smd.fail())
+            return false;
+
+        smd.write((char*)smd_partition, sizeof(smd_partition_t));
+        smd.flush();
+        if (smd.fail())
+            return false;
+    } else {
+        // SMD is on a device that does have an accessible partition table
+        // Open primary smd and write
+        std::ofstream smd(smd_device, std::ios::binary);
+        if(!smd.is_open())
+            return false;
+
+        smd.write((char*)smd_partition, sizeof(smd_partition_t));
+        smd.flush();
+        if (smd.fail())
+            return false;
+
+        // Open backup smd and write
+        std::ofstream smd_b(smd_device + "_b", std::ios::binary);
+        if(!smd_b.is_open())
+            return false;
+
+        smd_b.write((char*)smd_partition, sizeof(smd_partition_t));
+        smd_b.flush();
+        if (smd_b.fail())
+            return false;
+    }
 
     if (smd_info.device_type == TEGRABL_STORAGE_SDMMC_BOOT) {
         std::ofstream boot_lock("/sys/block/mmcblk0boot0/force_ro");
@@ -84,7 +177,7 @@ bool writeSlotMetadata(smd_partition_t *smd_partition) {
     }
 
     // Read back to validate successful write
-    return readSlotMetadata(&smd_verify);
+    return validateSlotMetadata();
 }
 
 unsigned getNumberSlots(boot_control_module_t *module __unused) {
