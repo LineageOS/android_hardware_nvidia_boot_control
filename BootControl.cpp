@@ -56,6 +56,12 @@ bool writeSlotMetadata(smd_partition_t *smd_partition) {
     char *buf = (char*)smd_partition;
     smd_partition_t smd_verify;
 
+    if (smd_info.device_type == TEGRABL_STORAGE_SDMMC_BOOT) {
+        std::ofstream boot_lock("/sys/block/mmcblk0boot0/force_ro");
+        if (boot_lock.is_open())
+            boot_lock.write("0", 1);
+    }
+
     std::ofstream smd(smd_device, std::ios::binary);
     if(!smd.is_open())
         return false;
@@ -70,6 +76,12 @@ bool writeSlotMetadata(smd_partition_t *smd_partition) {
 
     if (smd.fail())
         return false;
+
+    if (smd_info.device_type == TEGRABL_STORAGE_SDMMC_BOOT) {
+        std::ofstream boot_lock("/sys/block/mmcblk0boot0/force_ro");
+        if (boot_lock.is_open())
+            boot_lock.write("1", 1);
+    }
 
     // Read back to validate successful write
     return readSlotMetadata(&smd_verify);
