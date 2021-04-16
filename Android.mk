@@ -21,8 +21,8 @@ LOCAL_MODULE_RELATIVE_PATH := hw
 LOCAL_VENDOR_MODULE := true
 LOCAL_MODULE_TAGS := optional
 LOCAL_C_INCLUDES = $(LOCAL_PATH)/include
-LOCAL_HEADER_LIBRARIES := libhardware_headers
-LOCAL_SRC_FILES := bootctrl_nvidia.c
+LOCAL_HEADER_LIBRARIES := libhardware_headers libbase_headers
+LOCAL_SRC_FILES := BootControl.cpp
 
 LOCAL_SHARED_LIBRARIES := libcutils libz
 
@@ -33,21 +33,9 @@ include $(CLEAR_VARS)
 LOCAL_MODULE := bootctrl.tegra
 LOCAL_MODULE_TAGS := optional
 LOCAL_C_INCLUDES = $(LOCAL_PATH)/include external/zlib
-LOCAL_HEADER_LIBRARIES := libhardware_headers
-LOCAL_SRC_FILES := bootctrl_nvidia.c
+LOCAL_HEADER_LIBRARIES := libhardware_headers libbase_headers
+LOCAL_SRC_FILES := BootControl.cpp
 
 include $(BUILD_STATIC_LIBRARY)
-
-include $(CLEAR_VARS)
-
-LOCAL_SRC_FILES := boot_control.c
-LOCAL_SHARED_LIBRARIES := libhardware
-LOCAL_MODULE := bootctrl
-LOCAL_C_INCLUDES := \
-    hardware/libhardware/include \
-    $(LOCAL_PATH)/include
-LOCAL_CFLAGS := -Wno-unused-parameter
-
-include $(BUILD_EXECUTABLE)
 
 include $(call all-makefiles-under,$(LOCAL_PATH))
