@@ -12,13 +12,12 @@
 #define T186_NV_BOOTLOADER_PAYLOAD_UPDATER_H_
 
 #include <bootctrl_nvidia.h>
-#include <boot_control.h>
+#include <hardware/boot_control.h>
 
 #include <stdio.h>
 #include <iostream>
 #include <string>
 #include <fstream>
-#include <bootloader_payload_updater.h>
 
 #define UPDATE_TYPE 0
 #define BMP_TYPE 1
@@ -95,7 +94,17 @@ enum PartitionType {
     kDependPartition
 };
 
-class NvPayloadUpdate : public BLPayloadUpdate {
+enum BLStatus{
+   kSuccess = 0,
+   kBlobOpenFailed,
+   kBootctrlGetFailed,
+   kFsOpenFailed,
+   kInternalError,
+   kSlotOpenFailed,
+   kStatusMax
+};
+
+class NvPayloadUpdate {
  public:
     NvPayloadUpdate();
     ~NvPayloadUpdate() = default;
@@ -173,7 +182,5 @@ class NvPayloadUpdate : public BLPayloadUpdate {
     static void PrintHeader(Header* header);
     static void PrintEntryTable(Entry* entry_table, Header* header);
 };
-
-BLPayloadUpdate* make_updater() { return new NvPayloadUpdate(); }
 
 #endif  // T186_NV_BOOTLOADER_PAYLOAD_UPDATER_H_

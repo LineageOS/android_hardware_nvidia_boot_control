@@ -9,7 +9,6 @@
  */
 
 #include "nv_bootloader_payload_updater.h"
-#include <boot_control.h>
 #include <base/logging.h>
 #include <string>
 #include <iostream>
@@ -639,4 +638,12 @@ void NvPayloadUpdate::PrintEntryTable(Entry* entry_table, Header* header) {
                 << entry_table[i].version << "  "
                 << static_cast<int>(entry_table[i].type);
     }
+}
+
+int main() {
+    NvPayloadUpdate updater;
+
+    BLStatus status = updater.UpdateDriver();
+
+    return status;
 }
