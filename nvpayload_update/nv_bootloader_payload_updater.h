@@ -8,8 +8,8 @@
  * license agreement from NVIDIA Corporation is strictly prohibited.
  */
 
-#ifndef T210_NV_BOOTLOADER_PAYLOAD_UPDATER_H_
-#define T210_NV_BOOTLOADER_PAYLOAD_UPDATER_H_
+#ifndef T186_NV_BOOTLOADER_PAYLOAD_UPDATER_H_
+#define T186_NV_BOOTLOADER_PAYLOAD_UPDATER_H_
 
 #include <bootctrl_nvidia.h>
 #include <boot_control.h>
@@ -176,4 +176,4 @@ class NvPayloadUpdate : public BLPayloadUpdate {
 
 BLPayloadUpdate* make_updater() { return new NvPayloadUpdate(); }
 
-#endif  // T210_NV_BOOTLOADER_PAYLOAD_UPDATER_H_
+#endif  // T186_NV_BOOTLOADER_PAYLOAD_UPDATER_H_

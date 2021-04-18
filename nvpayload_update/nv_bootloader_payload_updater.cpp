@@ -15,8 +15,6 @@
 #include <iostream>
 
 extern "C" {
-#include <fdt_util.h>
-#include <bct_update.h>
 }
 
 boot_control_module_t *g_bootctrl_module = NULL;
@@ -264,8 +262,8 @@ BLStatus NvPayloadUpdate::WriteToBctPartition(Entry *entry_table,
     unsigned bct_count = 0;
     int offset = 0;
     int bin_size = entry_table->len;
-    BLStatus status;
-    int err;
+    //BLStatus status;
+    //int err;
 
     /*
      * Read update binary from blob
@@ -284,12 +282,12 @@ BLStatus NvPayloadUpdate::WriteToBctPartition(Entry *entry_table,
     /*
      * Update signature of current BCT
      */
-    err = update_bct_signedsection(cur_bct, new_bct, bin_size);
+    /*err = update_bct_signedsection(cur_bct, new_bct, bin_size);
     if (err) {
         LOG(ERROR) << "Update BCT signature failed, err = " << err;
         status = kInternalError;
         goto exit;
-    }
+    }*/
 
     pages_in_bct = DIV_CEIL(bin_size, BR_PAGE_SIZE);
 
@@ -508,13 +506,13 @@ BLStatus NvPayloadUpdate::WriteToUserPartition(Entry *entry_table,
     fseek(blob_file, entry_table->pos, SEEK_SET);
     bytes = fread(buffer, 1, part_size, blob_file);
 
-    if (!strcmp(entry_table->partition, KERNEL_DTB_NAME) &&
+    /*if (!strcmp(entry_table->partition, KERNEL_DTB_NAME) &&
             is_dtb_valid(reinterpret_cast<void*>(buffer), KERNEL_DTB, slot)) {
         goto exit;
     } else if (!strcmp(entry_table->partition, BL_DTB_NAME) &&
             is_dtb_valid(reinterpret_cast<void*>(buffer), BL_DTB, slot)) {
         goto exit;
-    }
+    }*/
 
     LOG(INFO) << "Writing to " << unused_path << " for "
         << entry_table->partition;
@@ -523,7 +521,7 @@ BLStatus NvPayloadUpdate::WriteToUserPartition(Entry *entry_table,
     LOG(INFO) << entry_table->partition
         << " write: bytes = " << bytes;
 
-exit:
+//exit:
     delete[] buffer;
     fclose(slot_stream);
 

@@ -32,23 +32,9 @@ common_cppflags := \
 
 include $(CLEAR_VARS)
 LOCAL_C_INCLUDES := \
-    system/update_engine/nvpayload_update \
-    $(LOCAL_PATH)/../include \
-    $(LOCAL_PATH)/../include/bct \
-    vendor/nvidia/tegra/bootloader/cboot/platform/t210/include \
-    $(LOCAL_PATH)/libfdt
+    $(LOCAL_PATH)/../include
 LOCAL_SRC_FILES := \
-    nv_bootloader_payload_updater.cpp \
-    bct/bct.c \
-    bct/bct_private.c \
-    bct/bct_update.c \
-    libfdt/fdt.c \
-    libfdt/fdt_ro.c \
-    libfdt/fdt_wip.c \
-    libfdt/fdt_sw.c \
-    libfdt/fdt_rw.c \
-    libfdt/fdt_strerror.c \
-    libfdt/fdt_util.c
+    nv_bootloader_payload_updater.cpp
 LOCAL_CFLAGS := $(common_cflags)
 LOCAL_CFLAGS += -Wno-sign-compare
 LOCAL_CPPFLAGS := $(common_cppflags)
@@ -56,19 +42,3 @@ LOCAL_MODULE_CLASS := STATIC_LIBRARIES
 LOCAL_SHARED_LIBRARIES := libchrome
 LOCAL_MODULE := libnvblpayload_updater
 include $(BUILD_STATIC_LIBRARY)
-
-include $(CLEAR_VARS)
-LOCAL_SRC_FILES := nvpayload_updater_unittest.cpp
-LOCAL_MODULE := nvpayload_updater_unittest
-LOCAL_C_INCLUDES := \
-    system/update_engine/nvpayload_update \
-    $(LOCAL_PATH)/../include
-LOCAL_STATIC_LIBRARIES := \
-    libnvblpayload_updater
-LOCAL_SHARED_LIBRARIES := \
-    libchrome \
-    libhardware
-LOCAL_CFLAGS := $(common_cflags)
-LOCAL_CFLAGS += -Wno-sign-compare
-LOCAL_CPPFLAGS := $(common_cppflags)
-include $(BUILD_EXECUTABLE)
