@@ -30,9 +30,9 @@ BLStatus NvPayloadUpdate::UpdateDriver() {
 
     status = BMPUpdater(BMP_PATH);
     if (status != kSuccess) {
-        LOG(ERROR) << "BMP Blob update failed. Status: "
+        LOG(WARNING) << "BMP Blob update failed. Status: "
             << static_cast<int>(status);
-       return status;
+       status = kSuccess;
     }
 
     return status;
@@ -43,6 +43,7 @@ NvPayloadUpdate::NvPayloadUpdate() {
 
     if (hw_get_module("bootctrl", &hw_module) != 0)  {
         LOG(ERROR) << "Error getting bootctrl module";
+	return;
     }
 
     g_bootctrl_module  = reinterpret_cast<boot_control_module_t*>(
@@ -58,6 +59,7 @@ BLStatus NvPayloadUpdate::BMPUpdater(const char* bmp_path) {
     int bytes;
     int err;
     Header* header = new Header;
+    size_t header_size = sizeof(Header);
     FILE* slot_stream;
     int current_slot;
     BLStatus status = kSuccess;
@@ -73,8 +75,8 @@ BLStatus NvPayloadUpdate::BMPUpdater(const char* bmp_path) {
     }
 
     // Parse Header
-    buffer = new char[HEADER_LEN];
-    bytes = fread(buffer, 1, HEADER_LEN, blob_file);
+    buffer = new char[header_size];
+    bytes = fread(buffer, 1, header_size, blob_file);
     ParseHeaderInfo((unsigned char*) buffer, header);
     delete[] buffer;
 
@@ -125,10 +127,11 @@ exit:
 BLStatus NvPayloadUpdate::OTAUpdater(const char* ota_path) {
     FILE* blob_file;
     Header* header = new Header;
-    char* buffer = new char[HEADER_LEN];
+    size_t header_size = sizeof(Header);
+    char* buffer = new char[header_size];
     int bytes = 0;
     int err;
-    BLStatus status;
+    BLStatus status = kSuccess;
 
     blob_file = fopen(ota_path, "r");
     if (!blob_file) {
@@ -136,17 +139,17 @@ BLStatus NvPayloadUpdate::OTAUpdater(const char* ota_path) {
     }
 
     // Parse the header
-    bytes = fread(buffer, 1, HEADER_LEN, blob_file);
+    bytes = fread(buffer, 1, header_size, blob_file);
     ParseHeaderInfo((unsigned char*) buffer, header);
     delete[] buffer;
 
     PrintHeader(header);
 
     // Parse the entry table
-    Entry* entry_table = new Entry[header->number_of_elements];
+    std::vector<Entry> entry_table;
     int entry_table_size = header->number_of_elements * ENTRY_LEN;
     buffer = new char[entry_table_size];
-    err = fseek(blob_file, HEADER_LEN, SEEK_SET);
+    err = fseek(blob_file, header->header_size, SEEK_SET);
     bytes = fread(buffer, 1, entry_table_size, blob_file);
     ParseEntryTable(buffer, entry_table, header);
     delete[] buffer;
@@ -155,23 +158,21 @@ BLStatus NvPayloadUpdate::OTAUpdater(const char* ota_path) {
 
     // Write each partition
     err = fseek(blob_file, 0, SEEK_SET);
-    status = WriteToPartition(entry_table, blob_file,
-                header->number_of_elements);
+    status = WriteToPartition(entry_table, blob_file);
     if (status) {
         LOG(ERROR) << "Writing to partitions failed.";
     }
 
     delete header;
-    delete[] entry_table;
     fclose(blob_file);
 
     return status;
 }
 
-static int OffsetOfBootPartition(const char *part, int slot) {
+static int OffsetOfBootPartition(std::string part, int slot) {
     int offset = 0;
 
-    if (!strcmp(part, "BCT")) {
+    if (part.compare("BCT")) {
         if (slot)
             return (BCT_MAX_COPIES - 1) * BR_BLOCK_SIZE;
         else
@@ -181,7 +182,7 @@ static int OffsetOfBootPartition(const char *part, int slot) {
     offset = PART_BCT_SIZE;
 
     for (unsigned i = 1; i < sizeof(boot_partiton)/sizeof(Partition); i++) {
-        if (!strcmp(part, boot_partiton[i].name)) {
+        if (!part.compare(boot_partiton[i].name)) {
             offset += slot * boot_partiton[i].part_size;
             break;
         }
@@ -210,7 +211,7 @@ BLStatus NvPayloadUpdate::EnableBootPartitionWrite(int enable) {
     return kSuccess;
 }
 
-char* NvPayloadUpdate::GetUnusedPartition(const char* partition_name,
+char* NvPayloadUpdate::GetUnusedPartition(std::string partition_name,
                                           int slot) {
     char* unused_path;
     const char* free_slot_name;
@@ -219,32 +220,32 @@ char* NvPayloadUpdate::GetUnusedPartition(const char* partition_name,
     free_slot_name =
         (slot)? BOOTCTRL_SUFFIX_B: BOOTCTRL_SUFFIX_A;
 
-    path_len = strlen(PARTITION_PATH) + strlen(partition_name)
+    path_len = strlen(PARTITION_PATH) + partition_name.length()
                             + strlen(free_slot_name) + 1;
 
     unused_path = new char[path_len];
     snprintf(unused_path, path_len,  "%s%s%s", PARTITION_PATH,
-        partition_name, free_slot_name);
+        partition_name.c_str(), free_slot_name);
 
     return unused_path;
 }
 
-bool NvPayloadUpdate::IsDependPartition(const char *partition) {
+bool NvPayloadUpdate::IsDependPartition(std::string partition) {
     unsigned int i;
 
     for (i = 0; i < sizeof(part_dependence)/sizeof(*part_dependence); i++) {
-        if (!strcmp(partition, part_dependence[i].name))
+        if (!partition.compare(part_dependence[i].name))
             return true;
     }
 
     return false;
 }
 
-bool NvPayloadUpdate::IsBootPartition(const char *partition) {
+bool NvPayloadUpdate::IsBootPartition(std::string partition) {
     unsigned int i;
 
-    for (i = 0; i < sizeof(boot_partiton)/sizeof(Partition); i++) {
-        if (!strcmp(partition, boot_partiton[i].name))
+    for (i = 0; i < sizeof(boot_partiton)/sizeof(*boot_partiton); i++) {
+        if (!partition.compare(boot_partiton[i].name))
             return true;
     }
 
@@ -391,7 +392,7 @@ BLStatus NvPayloadUpdate::WriteToBootPartition(Entry *entry_table,
         return kFsOpenFailed;
     }
 
-    if (!strcmp(entry_table->partition, "BCT")) {
+    if (!entry_table->partition.compare("BCT")) {
         status = WriteToBctPartition(entry_table, blob_file, bootp, slot);
     } else {
         /*
@@ -417,11 +418,11 @@ BLStatus NvPayloadUpdate::WriteToBootPartition(Entry *entry_table,
     return status;
 }
 
-void NvPayloadUpdate::GetEntryTable(const char *part, Entry *entry_t,
-                                    Entry entry_table[], int len) {
-    for (int i = 0; i < len; i++) {
-        if (!strcmp(entry_table[i].partition, part)) {
-            *entry_t = entry_table[i];
+void NvPayloadUpdate::GetEntryTable(std::string part, Entry *entry_t,
+                                    std::vector<Entry>& entry_table) {
+    for (auto entry : entry_table) {
+        if (!entry.partition.compare(part)) {
+            *entry_t = entry;
             break;
         }
     }
@@ -460,8 +461,8 @@ int NvPayloadUpdate::VerifiedPartiton(Entry *entry_table,
     return result;
 }
 
-BLStatus NvPayloadUpdate::WriteToDependPartition(Entry entry_table[],
-                                                 FILE* blob_file, int len) {
+BLStatus NvPayloadUpdate::WriteToDependPartition(std::vector<Entry>& entry_table,
+                                                 FILE* blob_file) {
     Entry entry_t;
     BLStatus status = kSuccess;
     int slot, i;
@@ -469,7 +470,7 @@ BLStatus NvPayloadUpdate::WriteToDependPartition(Entry entry_table[],
 
     for (i = 0; i < num_part; i++) {
         slot = part_dependence[i].slot;
-        GetEntryTable(part_dependence[i].name, &entry_t, entry_table, len);
+        GetEntryTable(part_dependence[i].name, &entry_t, entry_table);
         if (VerifiedPartiton(&entry_t, blob_file, slot)) {
             status = (entry_t.write)(&entry_t, blob_file, slot);
             if (status) {
@@ -527,8 +528,8 @@ BLStatus NvPayloadUpdate::WriteToUserPartition(Entry *entry_table,
     return kSuccess;
 }
 
-BLStatus NvPayloadUpdate::WriteToPartition(Entry entry_table[],
-                                           FILE* blob_file, int len) {
+BLStatus NvPayloadUpdate::WriteToPartition(std::vector<Entry>& entry_table,
+                                           FILE* blob_file) {
     BLStatus status = kSuccess;
     int current_slot;
 
@@ -543,19 +544,19 @@ BLStatus NvPayloadUpdate::WriteToPartition(Entry entry_table[],
         return kBootctrlGetFailed;
     }
 
-    for (int i = 0; i < len; i++) {
-        if (entry_table[i].type != kDependPartition) {
-            status = (entry_table[i].write)(&entry_table[i], blob_file,
+    for (auto entry : entry_table) {
+        if (entry.type != kDependPartition) {
+            status = (entry.write)(std::addressof(entry), blob_file,
                         !current_slot);
             if (status) {
-                LOG(INFO) << entry_table[i].partition
+                LOG(INFO) << entry.partition
                     << " fail to write ";
                 return status;
             }
         }
     }
 
-    status = WriteToDependPartition(entry_table, blob_file, len);
+    status = WriteToDependPartition(entry_table, blob_file);
     if (status) {
         LOG(INFO) << "Fail to write Dependence partitions ";
     }
@@ -585,36 +586,104 @@ void NvPayloadUpdate::ParseHeaderInfo(unsigned char* buffer,
 
     std::memcpy( &header->type, buffer, sizeof(int));
     buffer += sizeof(int);
+
+    std::memcpy( &header->uncomp_size, buffer, sizeof(int));
+    buffer += sizeof(int);
+
+    if (header->type == UPDATE_TYPE) {
+        std::memcpy( &header->ratchet_info, buffer, sizeof(RatchetInfo));
+        buffer += sizeof(RatchetInfo);
+    }
 }
 
-void NvPayloadUpdate::ParseEntryTable(char* buffer, Entry* entry_table,
+std::string NvPayloadUpdate::GetDeviceTNSpec() {
+    std::string specid, specconfig;
+    std::ifstream tnspec_id("/proc/device-tree/chosen/plugin-manager/tnspec/id");
+    std::ifstream tnspec_config("/proc/device-tree/chosen/plugin-manager/tnspec/config");
+
+    if (tnspec_id.is_open() && tnspec_config.is_open() &&
+        std::getline(tnspec_id, specid) &&
+        std::getline(tnspec_config, specconfig)) {
+        specid.erase(std::find(specid.begin(), specid.end(), '\0'),
+                     specid.end());
+        specconfig.erase(std::find(specconfig.begin(), specconfig.end(), '\0'),
+                         specconfig.end());
+        return specid + "." + specconfig;
+    }
+
+    return "";
+}
+
+uint8_t NvPayloadUpdate::GetDeviceOpMode() {
+    std::string opmode;
+    std::ifstream op_mode("/sys/module/tegra_fuse/parameters/tegra_prod_mode");
+
+    if (op_mode.is_open() && std::getline(op_mode, opmode))
+        return std::stoul(opmode, nullptr, 10);
+
+    // If detection fails, assume production mode. It's a pretty safe bet.
+    return 1;
+}
+
+void NvPayloadUpdate::ParseEntryTable(char* buffer, std::vector<Entry>& entry_table,
                                       Header* header) {
     int num_entries = header->number_of_elements;
+    Entry temp_entry;
+    std::string tnspec = GetDeviceTNSpec();
+
+    // Device op_mode is 0 or 1, but corresponds to 1 and 2 in a BUP entry
+    uint8_t op_mode = GetDeviceOpMode() + 1;
 
     for (int i = 0; i < num_entries; i++) {
-        std::memcpy(entry_table[i].partition, buffer,
-                                              (PARTITION_LEN)*sizeof(char));
+        temp_entry.partition.assign(buffer, PARTITION_LEN);
+        temp_entry.partition.erase(std::find(temp_entry.partition.begin(),
+                                             temp_entry.partition.end(), '\0'),
+                                   temp_entry.partition.end());
         buffer+= (PARTITION_LEN)*sizeof(char);
 
-        std::memcpy(&entry_table[i].pos, buffer, sizeof(int));
-        buffer+= sizeof(int);
+        std::memcpy(&temp_entry.pos, buffer, sizeof(int32_t));
+        buffer+= sizeof(int32_t);
 
-        std::memcpy(&entry_table[i].len, buffer, sizeof(int));
-        buffer+= sizeof(int);
+        std::memcpy(&temp_entry.len, buffer, sizeof(int32_t));
+        buffer+= sizeof(int32_t);
 
-        std::memcpy(&entry_table[i].version, buffer, sizeof(int));
-        buffer+= sizeof(int);
+        std::memcpy(&temp_entry.version, buffer, sizeof(int32_t));
+        buffer+= sizeof(int32_t);
 
-        if (IsDependPartition(entry_table[i].partition)) {
-            entry_table[i].type = kDependPartition;
-            entry_table[i].write = WriteToBootPartition;
-        } else if (IsBootPartition(entry_table[i].partition)) {
-            entry_table[i].type = kBootPartition;
-            entry_table[i].write = WriteToBootPartition;
+        std::memcpy(&temp_entry.op_mode, buffer, sizeof(int32_t));
+        buffer+= sizeof(int32_t);
+
+        temp_entry.spec_info.assign(buffer, IMG_SPEC_INFO_LENGTH);
+        temp_entry.spec_info.erase(std::find(temp_entry.spec_info.begin(),
+                                             temp_entry.spec_info.end(), '\0'),
+                                   temp_entry.spec_info.end());
+        buffer+= (IMG_SPEC_INFO_LENGTH)*sizeof(char);
+
+        // Conditions for a valid entry:
+        // - Entry tnspec is empty
+        // - Entry tnspec and device tnspec match
+        // - Entry op_mode is 0
+        // - Entry op_mode is 1 and device op_mode is 0
+        // - Entry op_mode is 2 and device op_mode is 1
+        // Otherwise, ignore the entry
+        if (!((temp_entry.spec_info.empty() ||
+               tnspec.compare(temp_entry.spec_info) == 0) &&
+              (temp_entry.op_mode == 0 ||
+               temp_entry.op_mode == op_mode)))
+            continue;
+
+        if (IsDependPartition(temp_entry.partition)) {
+            temp_entry.type = kDependPartition;
+            temp_entry.write = WriteToBootPartition;
+        } else if (IsBootPartition(temp_entry.partition)) {
+            temp_entry.type = kBootPartition;
+            temp_entry.write = WriteToBootPartition;
         } else {
-            entry_table[i].type = kUserPartition;
-            entry_table[i].write = WriteToUserPartition;
+            temp_entry.type = kUserPartition;
+            temp_entry.write = WriteToUserPartition;
         }
+
+	entry_table.push_back(temp_entry);
     }
 }
 
@@ -627,16 +696,16 @@ void NvPayloadUpdate::PrintHeader(Header* header) {
     LOG(INFO) << "HEADER_TYPE " << header->type;
 }
 
-void NvPayloadUpdate::PrintEntryTable(Entry* entry_table, Header* header) {
+void NvPayloadUpdate::PrintEntryTable(std::vector<Entry>& entry_table, Header* header) {
     LOG(INFO) << "ENTRY_TABLE:";
     LOG(INFO) << "PART  POS  LEN  VER TYPE";
 
-    for (int i = 0; i < header->number_of_elements; i++) {
-        LOG(INFO) << entry_table[i].partition << "  "
-                << entry_table[i].pos << "  "
-                << entry_table[i].len << "  "
-                << entry_table[i].version << "  "
-                << static_cast<int>(entry_table[i].type);
+    for (auto entry : entry_table) {
+        LOG(INFO) << entry.partition << "  "
+                << entry.pos << "  "
+                << entry.len << "  "
+                << entry.version << "  "
+                << static_cast<int>(entry.type);
     }
 }
 

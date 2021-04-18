@@ -18,26 +18,25 @@
 #include <iostream>
 #include <string>
 #include <fstream>
+#include <vector>
 
 #define UPDATE_TYPE 0
 #define BMP_TYPE 1
 
 #define UPDATE_MAGIC "NVIDIA__BLOB__V2"
 #define UPDATE_MAGIC_SIZE 17
-#define HEADER_LEN 36
-#define ENTRY_LEN 52
+#define ENTRY_LEN 120
+#define IMG_SPEC_INFO_LENGTH 64
 
 #define PARTITION_PATH "/dev/block/platform/sdhci-tegra.3/by-name/"
 #define BOOT_PART_PATH "/dev/block/platform/sdhci-tegra.3/mmcblk0boot0"
 #define BP_ENABLE_PATH "/sys/block/mmcblk0boot0/force_ro"
 #define PARTITION_LEN 40
 
-#define BMP_PATH "/data/misc/update_engine/bmp.blob"
-#define BLOB_PATH "/data/misc/update_engine/blob"
+#define BMP_PATH "/postinstall/system/etc/firmware/bmp.blob"
+#define BLOB_PATH "/postinstall/system/etc/firmware/bl_update_payload"
 
 #define BMP_NAME "BMP"
-#define KERNEL_DTB_NAME "DTB"
-#define BL_DTB_NAME "RP1"
 
 /* Compute ceil(n/d) */
 #define DIV_CEIL(n, d) (((n) + (d) - 1) / (d))
@@ -67,7 +66,7 @@
 #define PART_NVC_SIZE 262144
 
 struct Partition {
-    char name[PARTITION_LEN];
+    std::string name;
     int part_size;
 };
 
@@ -77,15 +76,15 @@ Partition boot_partiton[] = {
 };
 
 struct DependPartition {
-    const char *name;
+    std::string name;
     int slot;
 };
 
 DependPartition part_dependence[] = {
-    { "NVC", 0 },
+    { "mb1", 0 },
     { "BCT", 0 },
     { "BCT", 1 },
-    { "NVC", 1 },
+    { "mb1", 1 },
 };
 
 enum PartitionType {
@@ -117,22 +116,34 @@ class NvPayloadUpdate {
     BLStatus UpdateDriver();
 
  private:
+    struct RatchetInfo {
+        uint8_t mb1_ratchet_level;
+        uint8_t mts_ratchet_level;
+        uint8_t rollback_ratchet_level;
+        uint8_t reserved[5];
+    };
+
+
     struct Header{
         char magic[UPDATE_MAGIC_SIZE];
-        int hex;
-        int size;
-        int header_size;
-        int number_of_elements;
-        int type;
+        uint32_t hex;
+        uint32_t size;
+        uint32_t header_size;
+        uint32_t number_of_elements;
+        uint32_t type;
+        uint32_t uncomp_size;
+        struct RatchetInfo ratchet_info;
     };
 
     struct Entry{
-         char partition[PARTITION_LEN];
-         int pos;
-         int len;
-         int version;
-         PartitionType type;
-         BLStatus (*write)(Entry*, FILE*, int);
+        std::string partition;
+        uint32_t pos;
+        uint32_t len;
+        uint32_t version;
+        uint32_t op_mode;
+        std::string spec_info;
+        PartitionType type;
+        BLStatus (*write)(Entry*, FILE*, int);
     };
 
     // Updates the partitions in ota.blob
@@ -142,28 +153,29 @@ class NvPayloadUpdate {
     static BLStatus BMPUpdater(const char* bmp_path);
 
     // Gets the name of partition in unused slot
-    static char* GetUnusedPartition(const char* partition_name, int slot);
+    static char* GetUnusedPartition(std::string partition_name, int slot);
+
+    static std::string GetDeviceTNSpec();
+    static uint8_t GetDeviceOpMode();
 
     // Parses header in the payload
     static void ParseHeaderInfo(unsigned char* buffer, Header* header);
-    static void ParseEntryTable(char* buffer, Entry* entry_table,
+    static void ParseEntryTable(char* buffer, std::vector<Entry>& entry_table,
                                 Header* header);
 
-    static bool IsDependPartition(const char *partition);
-    static bool IsBootPartition(const char *partition);
-    static void GetEntryTable(const char *part, Entry *entry_t,
-                              Entry entry_table[],
-                              int len);
+    static bool IsDependPartition(std::string partition);
+    static bool IsBootPartition(std::string partition);
+    static void GetEntryTable(std::string part, Entry *entry_t,
+                              std::vector<Entry>& entry_table);
 
     // Writes to unused slot partitions from the payload
-    static BLStatus WriteToPartition(Entry entry_table[], FILE* blobfile,
-                                     int len);
+    static BLStatus WriteToPartition(std::vector<Entry>& entry_table, FILE* blobfile);
 
     static BLStatus WriteToUserPartition(Entry *entry_table,
                                          FILE* blobfile,
                                          int slot);
-    static BLStatus WriteToDependPartition(Entry entry_table[],
-                                           FILE* blobfile, int len);
+    static BLStatus WriteToDependPartition(std::vector<Entry>& entry_table,
+                                           FILE* blobfile);
 
     static BLStatus WriteToBootPartition(Entry *entry_table,
                                          FILE* blobfile, int slot);
@@ -180,7 +192,7 @@ class NvPayloadUpdate {
 
     // Log parsing of payload
     static void PrintHeader(Header* header);
-    static void PrintEntryTable(Entry* entry_table, Header* header);
+    static void PrintEntryTable(std::vector<Entry>& entry_table, Header* header);
 };
 
 #endif  // T186_NV_BOOTLOADER_PAYLOAD_UPDATER_H_
