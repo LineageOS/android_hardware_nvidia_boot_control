@@ -39,7 +39,7 @@ LOCAL_CFLAGS := $(common_cflags)
 LOCAL_CFLAGS += -Wno-sign-compare
 LOCAL_CPPFLAGS := $(common_cppflags)
 LOCAL_MODULE_CLASS := EXECUTABLES
-LOCAL_STATIC_LIBRARIES := libchrome liblog
+LOCAL_STATIC_LIBRARIES := libchrome liblog libbase
 LOCAL_FORCE_STATIC_EXECUTABLE := true
 LOCAL_MODULE := nv_bootloader_payload_updater
 include $(BUILD_EXECUTABLE)

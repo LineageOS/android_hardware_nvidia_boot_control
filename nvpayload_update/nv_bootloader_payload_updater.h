@@ -28,8 +28,7 @@
 #define ENTRY_LEN 120
 #define IMG_SPEC_INFO_LENGTH 64
 
-#define PARTITION_PATH "/dev/block/platform/sdhci-tegra.3/by-name/"
-#define BOOT_PART_PATH "/dev/block/platform/sdhci-tegra.3/mmcblk0boot0"
+#define PARTITION_PATH "/dev/block/by-name/"
 #define BP_ENABLE_PATH "/sys/block/mmcblk0boot0/force_ro"
 #define PARTITION_LEN 40
 
@@ -106,7 +105,7 @@ enum BLStatus{
 class NvPayloadUpdate {
  public:
     NvPayloadUpdate();
-    ~NvPayloadUpdate() = default;
+    ~NvPayloadUpdate();
 
     /* UpdateDriver - main function that parses the Bootloader
      * Payload (blob) and writes to partitions in unused slots.
@@ -151,9 +150,6 @@ class NvPayloadUpdate {
 
     // Updates BMP-A/BMP-B with bmp.blob
     static BLStatus BMPUpdater(const char* bmp_path);
-
-    // Gets the name of partition in unused slot
-    static char* GetUnusedPartition(std::string partition_name, int slot);
 
     static std::string GetDeviceTNSpec();
     static uint8_t GetDeviceOpMode();

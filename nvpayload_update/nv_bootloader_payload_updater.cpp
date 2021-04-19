@@ -10,13 +10,12 @@
 
 #include "nv_bootloader_payload_updater.h"
 #include <base/logging.h>
+#include <android-base/properties.h>
 #include <string>
 #include <iostream>
 
 extern "C" {
 }
-
-boot_control_module_t *g_bootctrl_module = NULL;
 
 BLStatus NvPayloadUpdate::UpdateDriver() {
     BLStatus status;
@@ -38,36 +37,36 @@ BLStatus NvPayloadUpdate::UpdateDriver() {
     return status;
 }
 
+uint8_t target_slot;
+std::string boot_part;
+std::string gpt_part;
+
 NvPayloadUpdate::NvPayloadUpdate() {
-    const hw_module_t* hw_module;
+    // If suffix prop is empty, guess slot a
+    std::string target_suffix = android::base::GetProperty("ro.boot.slot_suffix", "");
+    // slot is the target slot, so opposite of current
+    target_slot = (target_suffix.compare("_b") == 0 ? 0 : 1);
 
-    if (hw_get_module("bootctrl", &hw_module) != 0)  {
-        LOG(ERROR) << "Error getting bootctrl module";
-	return;
-    }
+    boot_part = android::base::GetProperty("vendor.tegra.ota.boot_device", "");
+    gpt_part = android::base::GetProperty("vendor.tegra.ota.gpt_device", boot_part);
+}
 
-    g_bootctrl_module  = reinterpret_cast<boot_control_module_t*>(
-                    const_cast<hw_module_t*>(hw_module));
-
-    g_bootctrl_module->init(g_bootctrl_module);
+NvPayloadUpdate::~NvPayloadUpdate() {
 }
 
 BLStatus NvPayloadUpdate::BMPUpdater(const char* bmp_path) {
     FILE* blob_file;
     char* buffer;
-    char* unused_path = NULL;
+    std::string unused_path = std::string(PARTITION_PATH) + BMP_PATH;
     int bytes;
     int err;
     Header* header = new Header;
     size_t header_size = sizeof(Header);
     FILE* slot_stream;
-    int current_slot;
     BLStatus status = kSuccess;
 
-    if (!g_bootctrl_module) {
-        LOG(ERROR) << "Error getting bootctrl module";
-        return kBootctrlGetFailed;
-    }
+    if (target_slot)
+        unused_path += "_b";
 
     blob_file = fopen(bmp_path, "r");
     if (!blob_file) {
@@ -86,24 +85,10 @@ BLStatus NvPayloadUpdate::BMPUpdater(const char* bmp_path) {
     buffer = new char[header->size];
     bytes = fread(buffer, 1, header->size, blob_file);
 
-    current_slot =
-        g_bootctrl_module->getCurrentSlot(g_bootctrl_module);
-    if (current_slot < 0) {
-        LOG(ERROR) << "Error getting current SLOT";
-        status = kBootctrlGetFailed;
-        goto exit;
-    }
-
-    unused_path = GetUnusedPartition(BMP_NAME, !current_slot);
-    if (!unused_path) {
-        status = kBootctrlGetFailed;
-        goto exit;
-    }
-
     LOG(INFO) << "Writing to " << unused_path << " for "
               << BMP_NAME;
 
-    slot_stream = fopen(unused_path, "rb+");
+    slot_stream = fopen(unused_path.c_str(), "rb+");
     if (!slot_stream) {
         LOG(ERROR) << "Slot could not be opened "<< BMP_NAME;
         status = kSlotOpenFailed;
@@ -209,25 +194,6 @@ BLStatus NvPayloadUpdate::EnableBootPartitionWrite(int enable) {
 
     fclose(fd);
     return kSuccess;
-}
-
-char* NvPayloadUpdate::GetUnusedPartition(std::string partition_name,
-                                          int slot) {
-    char* unused_path;
-    const char* free_slot_name;
-    int path_len;
-
-    free_slot_name =
-        (slot)? BOOTCTRL_SUFFIX_B: BOOTCTRL_SUFFIX_A;
-
-    path_len = strlen(PARTITION_PATH) + partition_name.length()
-                            + strlen(free_slot_name) + 1;
-
-    unused_path = new char[path_len];
-    snprintf(unused_path, path_len,  "%s%s%s", PARTITION_PATH,
-        partition_name.c_str(), free_slot_name);
-
-    return unused_path;
 }
 
 bool NvPayloadUpdate::IsDependPartition(std::string partition) {
@@ -378,12 +344,15 @@ BLStatus NvPayloadUpdate::WriteToBootPartition(Entry *entry_table,
     BLStatus status = kSuccess;
     int offset = 0;
 
+    if (boot_part.empty())
+        return kFsOpenFailed;
+
     status = EnableBootPartitionWrite(1);
     if (status) {
         return kFsOpenFailed;
     }
 
-    bootp = fopen(BOOT_PART_PATH, "rb+");
+    bootp = fopen(boot_part.c_str(), "rb+");
     if (!bootp) {
         LOG(ERROR) << "Boot Partition could not be opened "
             << entry_table->partition;
@@ -429,7 +398,8 @@ void NvPayloadUpdate::GetEntryTable(std::string part, Entry *entry_t,
 }
 
 int NvPayloadUpdate::VerifiedPartiton(Entry *entry_table,
-                                           FILE *blob_file, int slot) {
+                                           FILE *blob_file,
+                                           int slot) {
     FILE *fd;
     int offset;
     int bin_size = entry_table->len;
@@ -437,7 +407,10 @@ int NvPayloadUpdate::VerifiedPartiton(Entry *entry_table,
     char* target = new char[bin_size];
     int result;
 
-    fd = fopen(BOOT_PART_PATH, "r");
+    if (boot_part.empty())
+        return kFsOpenFailed;
+
+    fd = fopen(boot_part.c_str(), "r");
 
     offset = OffsetOfBootPartition(entry_table->partition, slot);
 
@@ -451,7 +424,7 @@ int NvPayloadUpdate::VerifiedPartiton(Entry *entry_table,
     result = memcmp(target, source, bin_size);
     if (result == 0) {
         LOG(INFO) << entry_table->partition
-            << " slot: " << slot
+            << " slot: " << std::to_string(slot)
             << " is updated. Skip... ";
     }
 
@@ -486,17 +459,15 @@ BLStatus NvPayloadUpdate::WriteToDependPartition(std::vector<Entry>& entry_table
 BLStatus NvPayloadUpdate::WriteToUserPartition(Entry *entry_table,
                                                FILE* blob_file,
                                                int slot) {
-    char* unused_path;
+    std::string unused_path = std::string(PARTITION_PATH) + entry_table->partition;
     FILE* slot_stream;
     int bytes = 0;
     int part_size = entry_table->len;
 
-    unused_path = GetUnusedPartition(entry_table->partition, slot);
-    if (!unused_path) {
-        return kBootctrlGetFailed;
-    }
+    if (slot)
+        unused_path += "_b";
 
-    slot_stream = fopen(unused_path, "rb+");
+    slot_stream = fopen(unused_path.c_str(), "rb+");
     if (!slot_stream) {
         LOG(ERROR) << "Slot could not be opened "<< entry_table->partition;
         return  kSlotOpenFailed;
@@ -531,23 +502,10 @@ BLStatus NvPayloadUpdate::WriteToUserPartition(Entry *entry_table,
 BLStatus NvPayloadUpdate::WriteToPartition(std::vector<Entry>& entry_table,
                                            FILE* blob_file) {
     BLStatus status = kSuccess;
-    int current_slot;
-
-    if (!g_bootctrl_module) {
-        LOG(ERROR) << "Error getting bootctrl module";
-        return kBootctrlGetFailed;
-    }
-
-    current_slot = g_bootctrl_module->getCurrentSlot(g_bootctrl_module);
-    if (current_slot < 0) {
-        LOG(ERROR) << "Error getting current SLOT";
-        return kBootctrlGetFailed;
-    }
 
     for (auto entry : entry_table) {
         if (entry.type != kDependPartition) {
-            status = (entry.write)(std::addressof(entry), blob_file,
-                        !current_slot);
+            status = (entry.write)(std::addressof(entry), blob_file, target_slot);
             if (status) {
                 LOG(INFO) << entry.partition
                     << " fail to write ";
