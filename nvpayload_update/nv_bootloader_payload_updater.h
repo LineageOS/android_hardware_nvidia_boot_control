@@ -48,31 +48,11 @@
  * TODO : read those value from block device
  *
  */
-#define BLOCK_SIZE 512
 #define BCT_MAX_COPIES 64
-#define BR_BLOCK_SIZE (16 * 1024)
-#define BR_PAGE_SIZE 512
-
-/*
- * The define of each partion in emmc boot partition.
- * Please refer to flash.xml for partition info.
- *
- * TODO: find a way to parse size of each partition.
- *
- */
-// Size of parttions
-#define PART_BCT_SIZE 3145728
-#define PART_NVC_SIZE 262144
-
-struct Partition {
-    std::string name;
-    int part_size;
-};
-
-Partition boot_partiton[] = {
-    { "BCT", PART_BCT_SIZE },
-    { "NVC", PART_NVC_SIZE },
-};
+#define BR_EMMC_BLOCK_SIZE (16 * 1024)
+#define BR_EMMC_PAGE_SIZE 512
+#define BR_QSPI_BLOCK_SIZE (32 * 1024)
+#define BR_QSPI_PAGE_SIZE (16 * 1024)
 
 struct DependPartition {
     std::string name;
@@ -142,6 +122,7 @@ class NvPayloadUpdate {
         uint32_t op_mode;
         std::string spec_info;
         PartitionType type;
+	uint8_t index;
         BLStatus (*write)(Entry*, FILE*, int);
     };
 
@@ -160,7 +141,6 @@ class NvPayloadUpdate {
                                 Header* header);
 
     static bool IsDependPartition(std::string partition);
-    static bool IsBootPartition(std::string partition);
     static void GetEntryTable(std::string part, Entry *entry_t,
                               std::vector<Entry>& entry_table);
 

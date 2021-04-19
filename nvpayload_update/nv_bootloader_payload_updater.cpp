@@ -13,6 +13,7 @@
 #include <android-base/properties.h>
 #include <string>
 #include <iostream>
+#include "gpt/gpttegra.h"
 
 extern "C" {
 }
@@ -40,6 +41,9 @@ BLStatus NvPayloadUpdate::UpdateDriver() {
 uint8_t target_slot;
 std::string boot_part;
 std::string gpt_part;
+GPTDataTegra BootGPT;
+uint32_t br_block_size;
+uint32_t br_page_size;
 
 NvPayloadUpdate::NvPayloadUpdate() {
     // If suffix prop is empty, guess slot a
@@ -49,6 +53,19 @@ NvPayloadUpdate::NvPayloadUpdate() {
 
     boot_part = android::base::GetProperty("vendor.tegra.ota.boot_device", "");
     gpt_part = android::base::GetProperty("vendor.tegra.ota.gpt_device", boot_part);
+
+    if (!gpt_part.empty()) {
+        BootGPT.SetDisk(gpt_part);
+        BootGPT.LoadTegraGPTData();
+    }
+
+    if (boot_part.compare("mtdblock") == 0) {
+        br_block_size = BR_QSPI_BLOCK_SIZE;
+	br_page_size = BR_QSPI_PAGE_SIZE;
+    } else { //if (boot_part.compare("boot0") == 0)
+        br_block_size = BR_EMMC_BLOCK_SIZE;
+	br_page_size = BR_EMMC_PAGE_SIZE;
+    }
 }
 
 NvPayloadUpdate::~NvPayloadUpdate() {
@@ -154,32 +171,20 @@ BLStatus NvPayloadUpdate::OTAUpdater(const char* ota_path) {
     return status;
 }
 
-static int OffsetOfBootPartition(std::string part, int slot) {
-    int offset = 0;
+static int OffsetOfBootPartition(std::string part, int slot, uint8_t index) {
+    if ((part.compare("BCT") == 0) && slot)
+        return ROUND_UP(br_block_size, BootGPT.GetBlockSize());
 
-    if (part.compare("BCT")) {
-        if (slot)
-            return (BCT_MAX_COPIES - 1) * BR_BLOCK_SIZE;
-        else
-            return 0;
-    }
-
-    offset = PART_BCT_SIZE;
-
-    for (unsigned i = 1; i < sizeof(boot_partiton)/sizeof(Partition); i++) {
-        if (!part.compare(boot_partiton[i].name)) {
-            offset += slot * boot_partiton[i].part_size;
-            break;
-        }
-        offset += 2 * boot_partiton[i].part_size;
-    }
-
-    return offset;
+    return BootGPT.GetOffset(index);
 }
 
 BLStatus NvPayloadUpdate::EnableBootPartitionWrite(int enable) {
     FILE* fd;
     int bytes = 0;
+
+    // Only needed for emmc boot partitions
+    if (boot_part.find("boot0") == std::string::npos)
+        return kSuccess;
 
     fd = fopen(BP_ENABLE_PATH, "rb+");
     if (!fd) {
@@ -207,17 +212,6 @@ bool NvPayloadUpdate::IsDependPartition(std::string partition) {
     return false;
 }
 
-bool NvPayloadUpdate::IsBootPartition(std::string partition) {
-    unsigned int i;
-
-    for (i = 0; i < sizeof(boot_partiton)/sizeof(*boot_partiton); i++) {
-        if (!partition.compare(boot_partiton[i].name))
-            return true;
-    }
-
-    return false;
-}
-
 BLStatus NvPayloadUpdate::WriteToBctPartition(Entry *entry_table,
                                                 FILE *blob_file,
                                                 FILE *bootp,
@@ -228,8 +222,6 @@ BLStatus NvPayloadUpdate::WriteToBctPartition(Entry *entry_table,
     unsigned bct_count = 0;
     int offset = 0;
     int bin_size = entry_table->len;
-    //BLStatus status;
-    //int err;
 
     /*
      * Read update binary from blob
@@ -245,17 +237,7 @@ BLStatus NvPayloadUpdate::WriteToBctPartition(Entry *entry_table,
     fseek(bootp, 0, SEEK_SET);
     bytes = fread(cur_bct, 1, bin_size, bootp);
 
-    /*
-     * Update signature of current BCT
-     */
-    /*err = update_bct_signedsection(cur_bct, new_bct, bin_size);
-    if (err) {
-        LOG(ERROR) << "Update BCT signature failed, err = " << err;
-        status = kInternalError;
-        goto exit;
-    }*/
-
-    pages_in_bct = DIV_CEIL(bin_size, BR_PAGE_SIZE);
+    pages_in_bct = DIV_CEIL(bin_size, br_page_size);
 
     /*
     The term "slot" refers to a potential location
@@ -265,7 +247,7 @@ BLStatus NvPayloadUpdate::WriteToBctPartition(Entry *entry_table,
     multiple pages. A block is a space in memory that
     can hold multiple slots of BCTs.
     */
-    slot_size = pages_in_bct * BR_PAGE_SIZE;
+    slot_size = pages_in_bct * br_page_size;
 
     /*
     The BCT search sequence followed by BootROM is:
@@ -294,8 +276,9 @@ BLStatus NvPayloadUpdate::WriteToBctPartition(Entry *entry_table,
      * Write one BCT to slot 1, block 0
      * if blocksize is bigger than twice of slotsize
      */
-    if (BR_BLOCK_SIZE > slot_size * 2) {
-        fseek(bootp, slot_size, SEEK_SET);
+    offset = ROUND_UP(slot_size, BootGPT.GetBlockSize());
+    if (br_block_size > offset) {
+        fseek(bootp, offset, SEEK_SET);
         bytes = fwrite(new_bct, 1, bin_size, bootp);
 
         LOG(INFO) << entry_table->partition << " write: offset = " << slot_size
@@ -314,17 +297,17 @@ BLStatus NvPayloadUpdate::WriteToBctPartition(Entry *entry_table,
 
 block_1:
     /* Fill Slot 0 for all other blocks */
-    offset = BR_BLOCK_SIZE;
-    while (offset < PART_BCT_SIZE) {
+    offset = ROUND_UP(br_block_size, BootGPT.GetBlockSize());
+    while (offset < BootGPT.GetSize(entry_table->index)) {
         fseek(bootp, offset, SEEK_SET);
         bytes = fwrite(new_bct, 1, bin_size, bootp);
 
         LOG(INFO) << entry_table->partition << " write: offset = " << offset
               << " bytes = " << bytes;
 
-        offset += BR_BLOCK_SIZE;
+        offset += ROUND_UP(br_block_size, BootGPT.GetBlockSize());
         bct_count++;
-        if (bct_count == BCT_MAX_COPIES - 1)
+        if (bct_count >= BCT_MAX_COPIES - 1)
             break;
     }
 
@@ -371,7 +354,7 @@ BLStatus NvPayloadUpdate::WriteToBootPartition(Entry *entry_table,
         fseek(blob_file, entry_table->pos, SEEK_SET);
         bytes = fread(buffer, 1, bin_size, blob_file);
 
-        offset = OffsetOfBootPartition(entry_table->partition, slot);
+        offset = OffsetOfBootPartition(entry_table->partition, slot, entry_table->index);
 
         fseek(bootp, offset , SEEK_SET);
         bytes = fwrite(buffer, 1, bin_size, bootp);
@@ -412,7 +395,7 @@ int NvPayloadUpdate::VerifiedPartiton(Entry *entry_table,
 
     fd = fopen(boot_part.c_str(), "r");
 
-    offset = OffsetOfBootPartition(entry_table->partition, slot);
+    offset = OffsetOfBootPartition(entry_table->partition, slot, entry_table->index);
 
     fseek(fd, offset, SEEK_SET);
     fread(source, 1, bin_size, fd);
@@ -466,6 +449,9 @@ BLStatus NvPayloadUpdate::WriteToUserPartition(Entry *entry_table,
 
     if (slot)
         unused_path += "_b";
+    // Certain os facing partitions have to use _a instead of empty for slot 0
+    else if (entry_table->partition.compare("kernel-dtb") == 0)
+        unused_path += "_a";
 
     slot_stream = fopen(unused_path.c_str(), "rb+");
     if (!slot_stream) {
@@ -477,14 +463,6 @@ BLStatus NvPayloadUpdate::WriteToUserPartition(Entry *entry_table,
     fseek(blob_file, entry_table->pos, SEEK_SET);
     bytes = fread(buffer, 1, part_size, blob_file);
 
-    /*if (!strcmp(entry_table->partition, KERNEL_DTB_NAME) &&
-            is_dtb_valid(reinterpret_cast<void*>(buffer), KERNEL_DTB, slot)) {
-        goto exit;
-    } else if (!strcmp(entry_table->partition, BL_DTB_NAME) &&
-            is_dtb_valid(reinterpret_cast<void*>(buffer), BL_DTB, slot)) {
-        goto exit;
-    }*/
-
     LOG(INFO) << "Writing to " << unused_path << " for "
         << entry_table->partition;
 
@@ -492,7 +470,6 @@ BLStatus NvPayloadUpdate::WriteToUserPartition(Entry *entry_table,
     LOG(INFO) << entry_table->partition
         << " write: bytes = " << bytes;
 
-//exit:
     delete[] buffer;
     fclose(slot_stream);
 
@@ -630,11 +607,13 @@ void NvPayloadUpdate::ParseEntryTable(char* buffer, std::vector<Entry>& entry_ta
                temp_entry.op_mode == op_mode)))
             continue;
 
-        if (IsDependPartition(temp_entry.partition)) {
-            temp_entry.type = kDependPartition;
-            temp_entry.write = WriteToBootPartition;
-        } else if (IsBootPartition(temp_entry.partition)) {
-            temp_entry.type = kBootPartition;
+        std::string part_match = temp_entry.partition;
+        if ((part_match.compare("BCT")) != 0 && target_slot)
+            part_match += "_b";
+
+        if (BootGPT.MatchPartition(part_match, &temp_entry.index)) {
+            temp_entry.type = (IsDependPartition(temp_entry.partition) ? 
+                               kDependPartition : kBootPartition);
             temp_entry.write = WriteToBootPartition;
         } else {
             temp_entry.type = kUserPartition;
