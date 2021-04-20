@@ -164,7 +164,7 @@ class NvPayloadUpdate {
                                         int slot);
 
 
-    static int VerifiedPartiton(Entry *entry_table, FILE *blob_file, int slot);
+    static int VerifiedPartition(Entry *entry_table, FILE *blob_file, int slot);
 
     // Log parsing of payload
     static void PrintHeader(Header* header);

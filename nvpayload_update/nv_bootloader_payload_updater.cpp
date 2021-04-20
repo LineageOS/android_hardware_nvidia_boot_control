@@ -358,10 +358,16 @@ BLStatus NvPayloadUpdate::WriteToBootPartition(Entry *entry_table,
 
         fseek(bootp, offset , SEEK_SET);
         bytes = fwrite(buffer, 1, bin_size, bootp);
+        fflush(bootp);
         delete[] buffer;
 
         LOG(INFO) << entry_table->partition
             << " write: offset = " << offset << " bytes = " << bytes;
+
+        if (VerifiedPartition(entry_table, blob_file, slot)) {
+            LOG(ERROR) << "Failed to write " << entry_table->partition;
+            status = kInternalError;
+        }
     }
 
     fclose(bootp);
@@ -380,7 +386,7 @@ void NvPayloadUpdate::GetEntryTable(std::string part, Entry *entry_t,
     }
 }
 
-int NvPayloadUpdate::VerifiedPartiton(Entry *entry_table,
+int NvPayloadUpdate::VerifiedPartition(Entry *entry_table,
                                            FILE *blob_file,
                                            int slot) {
     FILE *fd;
@@ -405,11 +411,6 @@ int NvPayloadUpdate::VerifiedPartiton(Entry *entry_table,
     fread(target, 1, bin_size, blob_file);
 
     result = memcmp(target, source, bin_size);
-    if (result == 0) {
-        LOG(INFO) << entry_table->partition
-            << " slot: " << std::to_string(slot)
-            << " is updated. Skip... ";
-    }
 
     delete[] target;
     delete[] source;
@@ -427,7 +428,7 @@ BLStatus NvPayloadUpdate::WriteToDependPartition(std::vector<Entry>& entry_table
     for (i = 0; i < num_part; i++) {
         slot = part_dependence[i].slot;
         GetEntryTable(part_dependence[i].name, &entry_t, entry_table);
-        if (VerifiedPartiton(&entry_t, blob_file, slot)) {
+        if (VerifiedPartition(&entry_t, blob_file, slot)) {
             status = (entry_t.write)(&entry_t, blob_file, slot);
             if (status) {
                 LOG(ERROR) << entry_t.partition <<" update failed ";
