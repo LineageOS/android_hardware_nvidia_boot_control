@@ -45,3 +45,11 @@ LOCAL_STATIC_LIBRARIES := libchrome liblog libbase libext2_uuid libsgdisk
 LOCAL_FORCE_STATIC_EXECUTABLE := true
 LOCAL_MODULE := nv_bootloader_payload_updater
 include $(BUILD_EXECUTABLE)
+
+include $(CLEAR_VARS)
+LOCAL_MODULE:= nv_postinstall
+LOCAL_MODULE_TAGS := optional
+LOCAL_MODULE_CLASS := EXECUTABLES
+LOCAL_SRC_FILES := nv_postinstall.sh
+LOCAL_REQUIRED_MODULES := nv_bootloader_payload_updater otapreopt_script
+include $(BUILD_PREBUILT)
