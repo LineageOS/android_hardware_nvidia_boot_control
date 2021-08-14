@@ -18,8 +18,7 @@ include $(CLEAR_VARS)
 
 LOCAL_SRC_FILES := generate-smd.c
 LOCAL_MODULE := nv_smd_generator
-LOCAL_C_INCLUDES := \
-    hardware/libhardware/include \
+LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include
 LOCAL_CFLAGS := -Wno-unused-parameter
 
 include $(BUILD_HOST_EXECUTABLE)

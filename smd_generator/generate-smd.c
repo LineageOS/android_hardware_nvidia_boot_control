@@ -15,46 +15,7 @@
 #include <string.h>
 #include <stdio.h>
 
-#define OFFSET_SLOT_METADATA 0
-
-#define BOOTCTRL_MAGIC 0x43424E00 /*magic number: '\0NBC' */
-#define BOOTCTRL_SUFFIX_A           "_a"
-#define BOOTCTRL_SUFFIX_B           "_b"
-#define MAX_SLOTS 2
-#define BOOTCTRL_VERSION 1
-
-typedef struct slot_info {
-    /*
-     * boot priority of slot.
-     * range [0:15]
-     * 15 meaning highest priortiy,
-     * 0 mean that the slot is unbootable.
-     */
-    uint8_t priority;
-    /*
-     * suffix of slots.
-     */
-    char suffix[2];
-    /*
-     * retry count of booting
-     * range [0:7]
-     */
-    uint8_t retry_count;
-
-    /* set true if slot can boot successfully */
-    uint8_t boot_successful;
-
-} slot_info_t;
-
-typedef struct smd_partition {
-    /* Magic number  for idetification */
-    uint32_t magic;
-    uint16_t version;
-    uint16_t num_slots;
-    /*slot parameter structure */
-    slot_info_t slot_info[MAX_SLOTS];
-    uint32_t crc32;
-} smd_partition_t;
+#include "bootctrl_nvidia.h"
 
 int main(int argc, char *argv[])
 {
