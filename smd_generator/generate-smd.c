@@ -14,12 +14,14 @@
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
+#include <zlib.h>
 
 #include "bootctrl_nvidia.h"
 
 int main(int argc, char *argv[])
 {
     smd_partition_t bootC;
+    ssize_t crc_size = sizeof(smd_partition_t) - sizeof(uint32_t);
 
     if (argc < 2) {
         printf("Usage: nv_smd_generator <out_file>\n");
@@ -39,6 +41,7 @@ int main(int argc, char *argv[])
     bootC.magic = BOOTCTRL_MAGIC;
     bootC.version = BOOTCTRL_VERSION;
     bootC.num_slots = MAX_SLOTS;
+    bootC.crc32 = crc32(0, (const unsigned char*)&bootC, crc_size);
 
     FILE* fout = fopen(argv[1], "w+");
     fwrite(&bootC, sizeof(smd_partition_t), 1, fout);

@@ -20,5 +20,6 @@ LOCAL_SRC_FILES := generate-smd.c
 LOCAL_MODULE := nv_smd_generator
 LOCAL_C_INCLUDES := $(LOCAL_PATH)/../include
 LOCAL_CFLAGS := -Wno-unused-parameter
+LOCAL_SHARED_LIBRARIES := libz
 
 include $(BUILD_HOST_EXECUTABLE)
