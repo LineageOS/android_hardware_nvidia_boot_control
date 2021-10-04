@@ -1,0 +1,27 @@
+{
+  "comments": [
+    {
+      "key": {
+        "uuid": "c99ea687_9f790a6e",
+        "filename": "smd_generator/Android.bp",
+        "patchSetId": 1
+      },
+      "lineNbr": 15,
+      "author": {
+        "id": 17401
+      },
+      "writtenOn": "2021-10-04T14:49:28Z",
+      "side": 1,
+      "message": "cc_binary_host ?",
+      "range": {
+        "startLine": 15,
+        "startChar": 0,
+        "endLine": 15,
+        "endChar": 10
+      },
+      "revId": "28694d4a6437d152f9cee09f18ccbbac4f5eb6d1",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71",
+      "unresolved": true
+    }
+  ]
+}
