@@ -9,7 +9,7 @@
  */
 
 #include "nv_bootloader_payload_updater.h"
-#include <base/logging.h>
+#include <android-base/logging.h>
 #include <android-base/properties.h>
 #include <string>
 #include <iostream>

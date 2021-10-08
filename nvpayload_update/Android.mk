@@ -27,8 +27,7 @@ common_cflags := \
     -fvisibility=hidden
 common_cppflags := \
     -Wnon-virtual-dtor \
-    -fno-strict-aliasing \
-    -std=gnu++11
+    -fno-strict-aliasing
 
 include $(CLEAR_VARS)
 LOCAL_C_INCLUDES := \
@@ -41,7 +40,7 @@ LOCAL_CFLAGS := $(common_cflags)
 LOCAL_CFLAGS += -Wno-sign-compare
 LOCAL_CPPFLAGS := $(common_cppflags)
 LOCAL_MODULE_CLASS := EXECUTABLES
-LOCAL_STATIC_LIBRARIES := libchrome liblog libbase libext2_uuid libsgdisk
+LOCAL_STATIC_LIBRARIES := liblog libbase libext2_uuid libsgdisk
 LOCAL_FORCE_STATIC_EXECUTABLE := true
 LOCAL_MODULE := nv_bootloader_payload_updater
 include $(BUILD_EXECUTABLE)
