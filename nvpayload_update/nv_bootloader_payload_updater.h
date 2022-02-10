@@ -35,7 +35,7 @@
 #define BMP_PATH "/postinstall/system/etc/firmware/bmp.blob"
 #define BLOB_PATH "/postinstall/system/etc/firmware/bl_update_payload"
 
-#define BMP_NAME "BMP"
+#define BMP_NAME "bootlogo"
 
 /* Compute ceil(n/d) */
 #define DIV_CEIL(n, d) (((n) + (d) - 1) / (d))
