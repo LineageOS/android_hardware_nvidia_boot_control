@@ -147,9 +147,17 @@ BLStatus NvPayloadUpdate::OTAUpdater(const char* ota_path) {
 
     PrintHeader(header);
 
+    uint8_t entry_len = ENTRY_LEN_WO_SPEC;
+    if (strncmp(header->magic, UPDATE_MAGIC_V2, UPDATE_MAGIC_SIZE) == 0)
+        entry_len += IMG_SPEC_INFO_LENGTH_V2;
+    else if (strncmp(header->magic, UPDATE_MAGIC_V3, UPDATE_MAGIC_SIZE) == 0)
+        entry_len += IMG_SPEC_INFO_LENGTH_V3;
+    else
+        return  kBlobOpenFailed;
+
     // Parse the entry table
     std::vector<Entry> entry_table;
-    int entry_table_size = header->number_of_elements * ENTRY_LEN;
+    int entry_table_size = header->number_of_elements * entry_len;
     buffer = new char[entry_table_size];
     err = fseek(blob_file, header->header_size, SEEK_SET);
     bytes = fread(buffer, 1, entry_table_size, blob_file);
@@ -570,6 +578,11 @@ void NvPayloadUpdate::ParseEntryTable(char* buffer, std::vector<Entry>& entry_ta
     // Device op_mode is 0 or 1, but corresponds to 1 and 2 in a BUP entry
     uint8_t op_mode = GetDeviceOpMode() + 1;
 
+    // Check spec length
+    uint8_t spec_len = IMG_SPEC_INFO_LENGTH_V2;
+    if (strncmp(header->magic, UPDATE_MAGIC_V3, UPDATE_MAGIC_SIZE) == 0)
+        spec_len = IMG_SPEC_INFO_LENGTH_V3;
+
     for (int i = 0; i < num_entries; i++) {
         temp_entry.partition.assign(buffer, PARTITION_LEN);
         temp_entry.partition.erase(std::find(temp_entry.partition.begin(),
@@ -589,11 +602,11 @@ void NvPayloadUpdate::ParseEntryTable(char* buffer, std::vector<Entry>& entry_ta
         std::memcpy(&temp_entry.op_mode, buffer, sizeof(int32_t));
         buffer+= sizeof(int32_t);
 
-        temp_entry.spec_info.assign(buffer, IMG_SPEC_INFO_LENGTH);
+        temp_entry.spec_info.assign(buffer, spec_len);
         temp_entry.spec_info.erase(std::find(temp_entry.spec_info.begin(),
                                              temp_entry.spec_info.end(), '\0'),
                                    temp_entry.spec_info.end());
-        buffer+= (IMG_SPEC_INFO_LENGTH)*sizeof(char);
+        buffer+= (spec_len)*sizeof(char);
 
         // Conditions for a valid entry:
         // - Entry tnspec is empty
