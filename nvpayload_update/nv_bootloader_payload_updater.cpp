@@ -74,7 +74,7 @@ NvPayloadUpdate::~NvPayloadUpdate() {
 BLStatus NvPayloadUpdate::BMPUpdater(const char* bmp_path) {
     FILE* blob_file;
     char* buffer;
-    std::string unused_path = std::string(PARTITION_PATH) + BMP_PATH;
+    std::string unused_path = std::string(PARTITION_PATH) + BMP_NAME;
     int bytes;
     int err;
     Header* header = new Header;
