@@ -23,10 +23,12 @@
 #define UPDATE_TYPE 0
 #define BMP_TYPE 1
 
-#define UPDATE_MAGIC "NVIDIA__BLOB__V2"
+#define UPDATE_MAGIC_V2 "NVIDIA__BLOB__V2"
+#define UPDATE_MAGIC_V3 "NVIDIA__BLOB__V3"
 #define UPDATE_MAGIC_SIZE 17
-#define ENTRY_LEN 120
-#define IMG_SPEC_INFO_LENGTH 64
+#define ENTRY_LEN_WO_SPEC 56
+#define IMG_SPEC_INFO_LENGTH_V2 64
+#define IMG_SPEC_INFO_LENGTH_V3 128
 
 #define PARTITION_PATH "/dev/block/by-name/"
 #define BP_ENABLE_PATH "/sys/block/mmcblk0boot0/force_ro"
