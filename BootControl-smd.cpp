@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-#include "BootControl.h"
+#include "BootControl-smd.h"
 
 #include <fstream>
 #include <zlib.h>
