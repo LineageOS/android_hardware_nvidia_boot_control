@@ -30,7 +30,9 @@ typedef enum {
     SOC_TYPE_UNKNOWN = 0,
     SOC_TYPE_T210,
     SOC_TYPE_T186,
-    SOC_TYPE_T194
+    SOC_TYPE_T194,
+    SOC_TYPE_T234,
+    SOC_TYPE_T239
 } soc_type_t;
 
 typedef enum {

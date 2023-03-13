@@ -368,6 +368,20 @@ soc_type_t BootControl::getSocType()
         soc_type = SOC_TYPE_T194;
     }
 
+    search_type = "nvidia,tegra234";
+    if (std::search(compatible.begin(), compatible.end(), search_type.begin(),
+                    search_type.end()) !=
+        compatible.end()) {
+        soc_type = SOC_TYPE_T234;
+    }
+
+    search_type = "nvidia,tegra239";
+    if (std::search(compatible.begin(), compatible.end(), search_type.begin(),
+                    search_type.end()) !=
+        compatible.end()) {
+        soc_type = SOC_TYPE_T239;
+    }
+
     return soc_type;
 }
 
@@ -385,6 +399,9 @@ BootControl::BootControl() {
             smd_info_offset = SMD_INFO_OFFSET_T19x;
             break;
 
+        // t23x was never publicly supported with cboot/SMD
+        case SOC_TYPE_T234:
+        case SOC_TYPE_T239:
         // Cannot read bct on t210, attempt to use a userspace visible SMD
         case SOC_TYPE_T210:
         // If soc is unknown, attempt to use a userspace visible SMD
