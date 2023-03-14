@@ -32,3 +32,24 @@ cc_library_shared {
         "android.hardware.boot@1.0",
     ],
 }
+
+cc_library_shared {
+    name: "android.hardware.boot@1.0-impl.nvidia-efi",
+    defaults: ["hidl_defaults"],
+    relative_install_path: "hw",
+    vendor: true,
+    recovery_available: true,
+    srcs: ["BootControl-efi.cpp"],
+
+    local_include_dirs: [
+        "include"
+    ],
+    shared_libs: [
+        "libbase",
+        "libefivar",
+        "libhidlbase",
+        "libhardware",
+        "libutils",
+        "android.hardware.boot@1.0",
+    ],
+}
