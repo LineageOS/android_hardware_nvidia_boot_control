@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+ifneq ($(TARGET_TEGRA_BOOTCTRL),)
+
 LOCAL_PATH := $(call my-dir)
 
 common_cflags := \
@@ -31,16 +33,24 @@ common_cppflags := \
 
 include $(CLEAR_VARS)
 LOCAL_C_INCLUDES := \
-    external/gptfdisk \
     $(LOCAL_PATH)/../include
-LOCAL_SRC_FILES := \
-    nv_bootloader_payload_updater.cpp \
-    gpt/gpttegra.cpp
 LOCAL_CFLAGS := $(common_cflags)
 LOCAL_CFLAGS += -Wno-sign-compare
 LOCAL_CPPFLAGS := $(common_cppflags)
 LOCAL_MODULE_CLASS := EXECUTABLES
-LOCAL_STATIC_LIBRARIES := liblog libbase libext2_uuid libgptf
+LOCAL_STATIC_LIBRARIES := liblog libbase
 LOCAL_FORCE_STATIC_EXECUTABLE := true
 LOCAL_MODULE := nv_bootloader_payload_updater
+ifeq ($(TARGET_TEGRA_BOOTCTRL),smd)
+LOCAL_SRC_FILES := \
+    nv_bootloader_payload_updater.cpp \
+    gpt/gpttegra.cpp
+LOCAL_STATIC_LIBRARIES += libext2_uuid libgptf
+else ifeq ($(TARGET_TEGRA_BOOTCTRL),efi)
+LOCAL_SRC_FILES := \
+    nv_bootloader_payload_updater-efi.cpp
+LOCAL_STATIC_LIBRARIES += libefivar libc++fs
+endif
 include $(BUILD_EXECUTABLE)
+
+endif
