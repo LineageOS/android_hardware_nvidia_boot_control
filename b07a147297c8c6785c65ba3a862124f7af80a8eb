@@ -1,0 +1,21 @@
+{
+  "comments": [
+    {
+      "unresolved": false,
+      "key": {
+        "uuid": "88f2168d_ad2e24d6",
+        "filename": "/PATCHSET_LEVEL",
+        "patchSetId": 1
+      },
+      "lineNbr": 0,
+      "author": {
+        "id": 14048
+      },
+      "writtenOn": "2023-12-04T04:42:28Z",
+      "side": 1,
+      "message": "Verified on quill, fixes fastbootd partition slot detection",
+      "revId": "b07a147297c8c6785c65ba3a862124f7af80a8eb",
+      "serverId": "1ec6b3db-b2c1-4fa4-84a2-4c7efe89ba71"
+    }
+  ]
+}
