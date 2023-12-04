@@ -328,7 +328,7 @@ Return<void> BootControl::getSuffix(uint32_t slot, getSuffix_cb _hidl_cb) {
         return Void();
     }
 
-    _hidl_cb(smd_partition.slot_info[slot].suffix);
+    _hidl_cb(std::string(smd_partition.slot_info[slot].suffix, 2));
 
     return Void();
 }
