@@ -12,6 +12,14 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+
+cc_library_headers {
+    name: "nvidia_bootctrl_headers",
+    recovery_available: true,
+    vendor_available: true,
+    export_include_dirs: ["include"],
+}
+
 cc_library_shared {
     name: "android.hardware.boot@1.0-impl.nvidia",
     defaults: ["hidl_defaults"],
@@ -19,10 +27,8 @@ cc_library_shared {
     vendor: true,
     recovery_available: true,
     srcs: ["BootControl-smd.cpp"],
+    header_libs: ["nvidia_bootctrl_headers"],
 
-    local_include_dirs: [
-        "include"
-    ],
     shared_libs: [
         "libbase",
         "libhidlbase",
