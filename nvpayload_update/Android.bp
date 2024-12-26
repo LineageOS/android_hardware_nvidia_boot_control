@@ -15,8 +15,9 @@
 cc_binary {
     name: "nv_bootloader_payload_updater",
     srcs: ["nv_bootloader_payload_updater.cpp", "gpt/gpttegra.cpp"],
-    static_executable: true,
     header_libs: ["nvidia_bootctrl_headers"],
+    product_available: true,
+    vendor_available: true,
 
     cflags: [
         "-Wa,--noexecstack",
@@ -37,8 +38,19 @@ cc_binary {
     ],
     static_libs: [
         "libbase",
-        "liblog",
         "libext2_uuid",
         "libgptf",
     ],
+    shared_libs: [
+        "liblog",
+    ],
+
+    target: {
+        product: {
+            cflags: ["-DIS_PRODUCT"],
+        },
+        vendor: {
+            cflags: ["-DIS_VENDOR"],
+        },
+    },
 }

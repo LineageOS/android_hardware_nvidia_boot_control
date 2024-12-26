@@ -12,7 +12,6 @@
 #define T186_NV_BOOTLOADER_PAYLOAD_UPDATER_H_
 
 #include <bootctrl_nvidia.h>
-#include <hardware/boot_control.h>
 
 #include <stdio.h>
 #include <iostream>
@@ -34,8 +33,16 @@
 #define BP_ENABLE_PATH "/sys/block/mmcblk0boot0/force_ro"
 #define PARTITION_LEN 40
 
+#if defined(IS_PRODUCT)
+#define BMP_PATH "/postinstall/etc/firmware/bmp.blob"
+#define BLOB_PATH "/postinstall/etc/firmware/bl_update_payload"
+#elif defined(IS_VENDOR)
+#define BMP_PATH "/postinstall/firmware/bmp.blob"
+#define BLOB_PATH "/postinstall/firmware/bl_update_payload"
+#else
 #define BMP_PATH "/postinstall/system/etc/firmware/bmp.blob"
 #define BLOB_PATH "/postinstall/system/etc/firmware/bl_update_payload"
+#endif
 
 #define BMP_NAME "bootlogo"
 
