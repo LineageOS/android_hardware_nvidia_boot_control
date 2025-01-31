@@ -34,13 +34,13 @@
 #define PARTITION_LEN 40
 
 #if defined(IS_PRODUCT)
-#define BMP_PATH "/postinstall/etc/firmware/bmp.blob"
+#define BMP_PATH "/postinstall/etc/firmware/bmp_update_payload"
 #define BLOB_PATH "/postinstall/etc/firmware/bl_update_payload"
 #elif defined(IS_VENDOR)
-#define BMP_PATH "/postinstall/firmware/bmp.blob"
+#define BMP_PATH "/postinstall/firmware/bmp_update_payload"
 #define BLOB_PATH "/postinstall/firmware/bl_update_payload"
 #else
-#define BMP_PATH "/postinstall/system/etc/firmware/bmp.blob"
+#define BMP_PATH "/postinstall/system/etc/firmware/bmp_update_payload"
 #define BLOB_PATH "/postinstall/system/etc/firmware/bl_update_payload"
 #endif
 
