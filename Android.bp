@@ -39,3 +39,41 @@ cc_library_shared {
         "android.hardware.boot@1.0",
     ],
 }
+
+cc_binary {
+    name: "android.hardware.boot-service.nvidia",
+    init_rc: ["android.hardware.boot-service.nvidia-smd.rc"],
+    vintf_fragments: ["android.hardware.boot-service.nvidia.xml"],
+    relative_install_path: "hw",
+    vendor: true,
+    srcs: ["main-smd.cpp", "BootControl-aidl-smd.cpp"],
+    header_libs: ["nvidia_bootctrl_headers"],
+
+    shared_libs: [
+        "libbase",
+        "libbinder_ndk",
+        "liblog",
+        "libhardware",
+        "libz",
+        "android.hardware.boot-V1-ndk",
+    ],
+}
+
+cc_binary {
+    name: "android.hardware.boot-service.nvidia.recovery",
+    init_rc: ["android.hardware.boot-service.nvidia-smd.recovery.rc"],
+    vintf_fragments: ["android.hardware.boot-service.nvidia.xml"],
+    relative_install_path: "hw",
+    recovery: true,
+    srcs: ["main-smd.cpp", "BootControl-aidl-smd.cpp"],
+    header_libs: ["nvidia_bootctrl_headers"],
+
+    shared_libs: [
+        "libbase",
+        "libbinder_ndk",
+        "liblog",
+        "libhardware",
+        "libz",
+        "android.hardware.boot-V1-ndk",
+    ],
+}

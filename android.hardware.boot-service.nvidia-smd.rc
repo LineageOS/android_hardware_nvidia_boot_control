@@ -1,0 +1,4 @@
+service vendor.boot-nvidia-smd /vendor/bin/hw/android.hardware.boot-service.nvidia
+    class early_hal
+    user root
+    group root
