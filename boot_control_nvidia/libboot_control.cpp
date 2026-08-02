@@ -39,8 +39,8 @@ using ::android::hardware::boot::V1_1::MergeStatus;
 
 // The number of boot attempts that should be made from a new slot before
 // rolling back to the previous slot.
-constexpr unsigned int kDefaultBootAttempts = 7;
-static_assert(kDefaultBootAttempts < 8, "tries_remaining field only has 3 bits");
+constexpr unsigned int kDefaultBootAttempts = 3;
+static_assert(kDefaultBootAttempts < 4, "tries_remaining field only has 2 bits");
 
 constexpr unsigned int kMaxNumSlots =
     sizeof(bootloader_control::slot_info) / sizeof(bootloader_control::slot_info[0]);
@@ -290,7 +290,7 @@ bool BootControl::SetActiveBootSlot(unsigned int slot) {
 
   // Set every other slot with a lower priority than the new "active" slot.
   const unsigned int kActivePriority = 15;
-  const unsigned int kActiveTries = 6;
+  const unsigned int kActiveTries = 2;
   for (unsigned int i = 0; i < num_slots_; ++i) {
     if (i != slot) {
       if (bootctrl.slot_info[i].priority >= kActivePriority)
