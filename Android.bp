@@ -77,3 +77,48 @@ cc_binary {
         "android.hardware.boot-V1-ndk",
     ],
 }
+
+cc_binary {
+    name: "android.hardware.boot-service.nvidia-msc",
+    init_rc: ["android.hardware.boot-service.nvidia-msc.rc"],
+    vintf_fragments: ["android.hardware.boot-service.nvidia.xml"],
+    relative_install_path: "hw",
+    vendor: true,
+    srcs: ["main-msc.cpp", "BootControl-aidl-msc.cpp"],
+    header_libs: ["nvidia_bootctrl_headers"],
+    defaults: ["libboot_control_defaults"],
+
+    stl: "c++_static",
+    shared_libs: [
+        "libbinder_ndk",
+        "liblog",
+    ],
+    static_libs: [
+        "android.hardware.boot@1.1",
+        "android.hardware.boot-V1-ndk",
+        "libbase",
+        "libboot_control_nvidia",
+    ],
+}
+
+cc_binary {
+    name: "android.hardware.boot-service.nvidia-msc.recovery",
+    init_rc: ["android.hardware.boot-service.nvidia-msc.recovery.rc"],
+    vintf_fragments: ["android.hardware.boot-service.nvidia.xml"],
+    relative_install_path: "hw",
+    recovery: true,
+    srcs: ["main-msc.cpp", "BootControl-aidl-msc.cpp"],
+    header_libs: ["nvidia_bootctrl_headers"],
+    defaults: ["libboot_control_defaults"],
+
+    stl: "c++_static",
+    shared_libs: [
+        "libbase",
+        "libbinder_ndk",
+        "android.hardware.boot@1.1",
+        "android.hardware.boot-V1-ndk",
+    ],
+    static_libs: [
+        "libboot_control_nvidia",
+    ],
+}
