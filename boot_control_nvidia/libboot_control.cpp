@@ -151,7 +151,6 @@ void InitDefaultBootloaderControl(BootControl* control, bootloader_control* boot
     if ((last_existing_slot != -1 && last_existing_slot + 1 == first_missing_slot) ||
         (first_missing_slot == -1 && last_existing_slot + 1 == kMaxNumSlots)) {
       boot_ctrl->nb_slot = last_existing_slot + 1;
-      LOG(INFO) << "Found a system with " << last_existing_slot + 1 << " slots.";
     }
   }
 
@@ -227,8 +226,6 @@ bool BootControl::Init() {
   // with the current information.
   uint32_t computed_crc32 = BootloaderControlLECRC(&boot_ctrl);
   if (boot_ctrl.crc32_le != computed_crc32) {
-    LOG(WARNING) << "Invalid boot control found, expected CRC-32 0x" << std::hex << computed_crc32
-                 << " but found 0x" << std::hex << boot_ctrl.crc32_le << ". Re-initializing.";
     InitDefaultBootloaderControl(this, &boot_ctrl);
     UpdateAndSaveBootloaderControl(device.c_str(), &boot_ctrl);
   }
